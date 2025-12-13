@@ -146,3 +146,5 @@ npm run dev
 Your Firebase integration is complete. Just enable the services in Firebase Console and configure the security rules, then you can start using the application!
 
 
+
+

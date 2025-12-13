@@ -4,8 +4,9 @@ import { useAuth } from "../../../context/AuthContext";
 import { getCases, createCase, updateCase, deleteCase } from "../../../lib/api-client";
 import { storage } from "../../../lib/firebase/config";
 import { ref, uploadBytesResumable } from "firebase/storage";
-import { FaGavel, FaFileAlt, FaCalendarAlt, FaUser, FaBuilding, FaHashtag, FaCheckCircle, FaClock, FaPauseCircle, FaUpload, FaTimes, FaComments, FaTasks } from "react-icons/fa";
+import { FaGavel, FaFileAlt, FaCalendarAlt, FaUser, FaBuilding, FaHashtag, FaCheckCircle, FaClock, FaPauseCircle, FaUpload, FaTimes, FaComments, FaTasks, FaSearch } from "react-icons/fa";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
 interface Case {
     id: string;
@@ -22,10 +23,14 @@ interface Case {
 
 const CasesPage: React.FC = () => {
     const { user } = useAuth();
+    const searchParams = useSearchParams();
+    const searchQuery = searchParams?.get("search") || "";
     const [cases, setCases] = useState<Case[]>([]);
+    const [filteredCases, setFilteredCases] = useState<Case[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [showModal, setShowModal] = useState(false);
+    const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery);
     const [form, setForm] = useState<{
         title: string;
         description: string;
@@ -63,7 +68,26 @@ const CasesPage: React.FC = () => {
                 setCases(res);
                 setError("");
 
-                // Fetch statistics for each case
+                // Apply search filter if query exists
+                if (searchQuery.trim()) {
+                    const filtered = res.filter((c: Case) =>
+                        c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        c.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        c.caseNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        c.court?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        c.oppositeParty?.toLowerCase().includes(searchQuery.toLowerCase())
+                    );
+                    setFilteredCases(filtered);
+                } else {
+                    setFilteredCases(res);
+                }
+
+                // Fetch statistics for each case (only if user is authenticated)
+                if (!user) {
+                    setLoading(false);
+                    return;
+                }
+
                 const { getFirestore, collection, query, where, getDocs } = await import("firebase/firestore");
                 const { app } = await import("../../../lib/firebase/config");
                 const db = getFirestore(app);
@@ -84,7 +108,9 @@ const CasesPage: React.FC = () => {
                             tasks: tasksSnap.size,
                             conversations: conversationsSnap.size,
                         };
-                    } catch {
+                    } catch (err) {
+                        // Silently fail for permissions errors - stats will show 0
+                        console.warn(`Could not fetch stats for case ${c.id}:`, err);
                         return {
                             caseId: c.id,
                             documents: 0,
@@ -112,7 +138,43 @@ const CasesPage: React.FC = () => {
             setLoading(false);
         };
         fetchCases();
-    }, [user]);
+    }, [user, searchQuery]);
+
+    // Update local search when URL param changes
+    useEffect(() => {
+        if (searchParams?.get("search")) {
+            setLocalSearchQuery(searchParams.get("search") || "");
+        } else {
+            setLocalSearchQuery("");
+        }
+    }, [searchParams]);
+
+    // Filter cases based on local search query
+    useEffect(() => {
+        if (localSearchQuery.trim()) {
+            const filtered = cases.filter((c: Case) =>
+                c.title.toLowerCase().includes(localSearchQuery.toLowerCase()) ||
+                c.description?.toLowerCase().includes(localSearchQuery.toLowerCase()) ||
+                c.caseNumber?.toLowerCase().includes(localSearchQuery.toLowerCase()) ||
+                c.court?.toLowerCase().includes(localSearchQuery.toLowerCase()) ||
+                c.oppositeParty?.toLowerCase().includes(localSearchQuery.toLowerCase())
+            );
+            setFilteredCases(filtered);
+        } else {
+            setFilteredCases(cases);
+        }
+    }, [localSearchQuery, cases]);
+
+    const handleSearch = (e: React.FormEvent) => {
+        e.preventDefault();
+        const params = new URLSearchParams();
+        if (localSearchQuery.trim()) {
+            params.set("search", localSearchQuery.trim());
+            window.history.pushState({}, "", `/cases?${params.toString()}`);
+        } else {
+            window.history.pushState({}, "", "/cases");
+        }
+    };
 
     const handleAddOrUpdate = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -280,15 +342,42 @@ const CasesPage: React.FC = () => {
     };
 
     return (
-        <div className="p-4 max-w-7xl mx-auto">
-            <div className="flex items-center justify-between mb-4">
+        <div className="p-2 sm:p-4 max-w-7xl mx-auto">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900">My Cases</h1>
-                    <p className="text-slate-600 text-sm mt-0.5">Manage your legal cases and documents</p>
+                    <h1 className="text-xl sm:text-2xl font-bold text-slate-900">My Cases</h1>
+                    <p className="text-slate-600 text-xs sm:text-sm mt-0.5">Manage your legal cases and documents</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                    {/* Search Bar */}
+                    <form onSubmit={handleSearch} className="flex-1 sm:flex-initial sm:min-w-[250px]">
+                        <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <FaSearch className="text-slate-400 text-sm" />
+                            </div>
+                            <input
+                                type="text"
+                                value={localSearchQuery}
+                                onChange={(e) => setLocalSearchQuery(e.target.value)}
+                                placeholder="Search cases..."
+                                className="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                            />
+                            {localSearchQuery && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setLocalSearchQuery("");
+                                        window.history.pushState({}, "", "/cases");
+                                    }}
+                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+                                >
+                                    <span className="text-lg">×</span>
+                                </button>
+                            )}
+                        </div>
+                    </form>
                     <button
-                        className="bg-slate-900 text-white px-4 py-2 rounded-lg hover:bg-slate-800 transition-all shadow-md hover:shadow-lg font-semibold flex items-center gap-2 text-sm"
+                        className="bg-slate-900 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-slate-800 transition-all shadow-md hover:shadow-lg font-semibold flex items-center justify-center gap-2 text-xs sm:text-sm"
                         onClick={() => {
                             setEditId(null);
                             setForm({
@@ -309,7 +398,7 @@ const CasesPage: React.FC = () => {
                         <FaFileAlt /> Add New Case
                     </button>
                     <button
-                        className="bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 transition-all shadow-md hover:shadow-lg font-semibold flex items-center gap-2 text-sm"
+                        className="bg-amber-600 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-amber-700 transition-all shadow-md hover:shadow-lg font-semibold flex items-center justify-center gap-2 text-xs sm:text-sm"
                         onClick={async () => {
                             if (!user) return;
                             try {
@@ -342,14 +431,28 @@ const CasesPage: React.FC = () => {
                 </div>
             ) : error ? (
                 <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">{error}</div>
+            ) : filteredCases.length === 0 && localSearchQuery ? (
+                <div className="text-center py-12 bg-white rounded-lg border-2 border-dashed border-slate-300">
+                    <FaSearch className="text-4xl text-slate-400 mx-auto mb-3" />
+                    <p className="text-slate-600 mb-2">No cases found matching "{localSearchQuery}"</p>
+                    <button
+                        onClick={() => {
+                            setLocalSearchQuery("");
+                            window.history.pushState({}, "", "/cases");
+                        }}
+                        className="text-amber-600 hover:text-amber-700 font-medium text-sm"
+                    >
+                        Clear search
+                    </button>
+                </div>
             ) : cases.length === 0 ? (
                 <div className="text-center py-8 bg-white rounded-lg border-2 border-dashed border-slate-300">
                     <FaFileAlt className="text-4xl text-slate-400 mx-auto mb-3" />
                     <p className="text-slate-600">No cases found. Create your first case!</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {cases.map(c => {
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
+                    {filteredCases.map(c => {
                         const getStatusIcon = () => {
                             switch (c.status) {
                                 case "active": return <FaCheckCircle className="text-green-600" />;
@@ -426,9 +529,9 @@ const CasesPage: React.FC = () => {
                                     </div>
                                 )}
 
-                                <div className="flex gap-1.5 pt-3 border-t border-slate-200">
-                                    <Link href={`/cases/${c.id}`} className="flex-1 bg-slate-900 text-white rounded px-2 py-1.5 hover:bg-slate-800 transition font-medium text-xs text-center">
-                                        <FaGavel className="inline mr-1" /> View
+                                <div className="flex gap-1 sm:gap-1.5 pt-3 border-t border-slate-200">
+                                    <Link href={`/cases/${c.id}`} className="flex-1 bg-slate-900 text-white rounded px-2 py-1.5 hover:bg-slate-800 transition font-medium text-xs text-center flex items-center justify-center gap-1">
+                                        <FaGavel className="text-xs" /> <span className="hidden sm:inline">View</span>
                                     </Link>
                                     <button onClick={() => handleEdit(c)} className="flex-1 bg-amber-600 text-white rounded px-2 py-1.5 hover:bg-amber-700 transition font-medium text-xs">Edit</button>
                                     <button onClick={() => handleDelete(c.id)} className="flex-1 bg-red-600 text-white rounded px-2 py-1.5 hover:bg-red-700 transition font-medium text-xs">Del</button>
@@ -441,15 +544,15 @@ const CasesPage: React.FC = () => {
 
             {/* Modal */}
             {showModal && (
-                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-4 overflow-y-auto">
+                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-2 sm:p-4 overflow-y-auto">
                     <form
                         onSubmit={handleAddOrUpdate}
-                        className="bg-white rounded-lg p-6 shadow-2xl space-y-3 w-full max-w-2xl border-t-4 border-amber-500 my-4"
+                        className="bg-white rounded-lg p-4 sm:p-6 shadow-2xl space-y-3 w-full max-w-2xl border-t-4 border-amber-500 my-2 sm:my-4 max-h-[95vh] overflow-y-auto"
                     >
-                        <h2 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
-                            <FaFileAlt className="text-amber-600" /> {editId ? "Edit Case" : "Add New Case"}
+                        <h2 className="text-lg sm:text-xl font-bold text-slate-900 mb-3 sm:mb-4 flex items-center gap-2">
+                            <FaFileAlt className="text-amber-600" /> <span className="text-sm sm:text-lg">{editId ? "Edit Case" : "Add New Case"}</span>
                         </h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                             <div className="md:col-span-2">
                                 <label className="block text-xs font-semibold text-slate-700 mb-1">Case Title *</label>
                                 <input
