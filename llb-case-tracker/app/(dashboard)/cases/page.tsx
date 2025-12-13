@@ -4,7 +4,7 @@ import { useAuth } from "../../../context/AuthContext";
 import { getCases, createCase, updateCase, deleteCase } from "../../../lib/api-client";
 import { storage } from "../../../lib/firebase/config";
 import { ref, uploadBytesResumable } from "firebase/storage";
-import { FaGavel, FaFileAlt, FaCalendarAlt, FaUser, FaBuilding, FaHashtag, FaCheckCircle, FaClock, FaPauseCircle, FaUpload, FaTimes, FaComments, FaTasks, FaSearch } from "react-icons/fa";
+import { FaGavel, FaFileAlt, FaCalendarAlt, FaUser, FaBuilding, FaHashtag, FaCheckCircle, FaClock, FaPauseCircle, FaUpload, FaTimes, FaComments, FaTasks, FaSearch, FaTrash } from "react-icons/fa";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
@@ -22,7 +22,7 @@ interface Case {
 }
 
 const CasesPage: React.FC = () => {
-    const { user } = useAuth();
+    const { user, userData } = useAuth();
     const searchParams = useSearchParams();
     const searchQuery = searchParams?.get("search") || "";
     const [cases, setCases] = useState<Case[]>([]);
@@ -57,6 +57,8 @@ const CasesPage: React.FC = () => {
     const [uploading, setUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
     const [caseStats, setCaseStats] = useState<{ [caseId: string]: { documents: number; hearings: number; tasks: number; conversations: number } }>({});
+    const [deletingCaseId, setDeletingCaseId] = useState<string | null>(null);
+    const [successMessage, setSuccessMessage] = useState<string>("");
 
     // Fetch cases for current user
     useEffect(() => {
@@ -64,7 +66,7 @@ const CasesPage: React.FC = () => {
         const fetchCases = async () => {
             setLoading(true);
             try {
-                const res = await getCases(user.uid);
+                const res = await getCases(user.uid, userData?.organizationId);
                 setCases(res);
                 setError("");
 
@@ -132,13 +134,19 @@ const CasesPage: React.FC = () => {
                     };
                 });
                 setCaseStats(statsMap);
-            } catch {
-                setError("Failed to fetch cases");
+            } catch (err) {
+                const errorMessage = err instanceof Error ? err.message : "Failed to fetch cases";
+                // If user has no organization, show helpful message
+                if (!userData?.organizationId) {
+                    setError("No organization assigned. Your cases may not be visible. Please contact your administrator to be added to an organization.");
+                } else {
+                    setError(errorMessage);
+                }
             }
             setLoading(false);
         };
         fetchCases();
-    }, [user, searchQuery]);
+    }, [user, userData?.organizationId, searchQuery]);
 
     // Update local search when URL param changes
     useEffect(() => {
@@ -178,15 +186,23 @@ const CasesPage: React.FC = () => {
 
     const handleAddOrUpdate = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!user) return;
+        if (!user) {
+            setError("You must be logged in to create cases.");
+            return;
+        }
+        if (!userData?.organizationId) {
+            setError("No organization assigned. Please contact your administrator to be added to an organization.");
+            setUploading(false);
+            return;
+        }
         setUploading(true);
         setError("");
         try {
             let newCaseId: string | undefined;
             if (editId) {
-                await updateCase({ id: editId, ...form, userId: user.uid });
+                await updateCase({ id: editId, ...form, userId: user.uid, organizationId: userData.organizationId });
             } else {
-                const result = await createCase({ ...form, userId: user.uid });
+                const result = await createCase({ ...form, userId: user.uid, organizationId: userData.organizationId });
                 newCaseId = result.id;
             }
 
@@ -275,7 +291,7 @@ const CasesPage: React.FC = () => {
             setUploadProgress({});
             setEditId(null);
             // Refresh
-            const res = await getCases(user.uid);
+            const res = await getCases(user.uid, userData?.organizationId);
             setCases(res);
 
             // Refresh statistics
@@ -332,12 +348,65 @@ const CasesPage: React.FC = () => {
         setShowModal(true);
     };
     const handleDelete = async (id: string) => {
-        if (!user) return;
+        if (!user) {
+            setError("You must be logged in to delete cases.");
+            return;
+        }
+
+        // Confirmation dialog
+        if (!confirm("Are you sure you want to delete this case? This action cannot be undone.")) {
+            return;
+        }
+
+        // Set deleting state for animation
+        setDeletingCaseId(id);
+        setError("");
+        setSuccessMessage("");
+
         try {
-            await deleteCase({ id, userId: user.uid });
-            setCases(prev => prev.filter(c => c.id !== id));
-        } catch {
-            setError("Could not delete case");
+            // organizationId is optional - allows deletion of legacy cases (without organizationId)
+            await deleteCase({
+                id,
+                userId: user.uid,
+                organizationId: userData?.organizationId
+            });
+
+            // Show success message
+            const deletedCase = cases.find(c => c.id === id);
+            setSuccessMessage(`Case "${deletedCase?.title || 'Case'}" deleted successfully`);
+
+            // Wait a bit for fade-out animation, then remove from state
+            setTimeout(() => {
+                // Update both cases and filteredCases
+                setCases(prev => prev.filter(c => c.id !== id));
+                setFilteredCases(prev => prev.filter(c => c.id !== id));
+                // Also remove from stats
+                setCaseStats(prev => {
+                    const updated = { ...prev };
+                    delete updated[id];
+                    return updated;
+                });
+                setDeletingCaseId(null);
+            }, 300); // Match animation duration
+
+            // Auto-hide success message after 3 seconds
+            setTimeout(() => {
+                setSuccessMessage("");
+            }, 3000);
+        } catch (err) {
+            console.error("Error deleting case:", err);
+            setDeletingCaseId(null);
+            let errorMessage = "Could not delete case";
+            if (err instanceof Error) {
+                if (err.message.includes("Unauthorized") || err.message.includes("403")) {
+                    errorMessage = "You don't have permission to delete this case.";
+                } else if (err.message.includes("not found") || err.message.includes("404")) {
+                    errorMessage = "Case not found. It may have already been deleted.";
+                } else {
+                    errorMessage = err.message || errorMessage;
+                }
+            }
+            setError(errorMessage);
         }
     };
 
@@ -429,117 +498,165 @@ const CasesPage: React.FC = () => {
                     <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-slate-900"></div>
                     <p className="mt-2 text-slate-600 text-sm">Loading cases...</p>
                 </div>
-            ) : error ? (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">{error}</div>
-            ) : filteredCases.length === 0 && localSearchQuery ? (
-                <div className="text-center py-12 bg-white rounded-lg border-2 border-dashed border-slate-300">
-                    <FaSearch className="text-4xl text-slate-400 mx-auto mb-3" />
-                    <p className="text-slate-600 mb-2">No cases found matching "{localSearchQuery}"</p>
-                    <button
-                        onClick={() => {
-                            setLocalSearchQuery("");
-                            window.history.pushState({}, "", "/cases");
-                        }}
-                        className="text-amber-600 hover:text-amber-700 font-medium text-sm"
-                    >
-                        Clear search
-                    </button>
-                </div>
-            ) : cases.length === 0 ? (
-                <div className="text-center py-8 bg-white rounded-lg border-2 border-dashed border-slate-300">
-                    <FaFileAlt className="text-4xl text-slate-400 mx-auto mb-3" />
-                    <p className="text-slate-600">No cases found. Create your first case!</p>
-                </div>
             ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
-                    {filteredCases.map(c => {
-                        const getStatusIcon = () => {
-                            switch (c.status) {
-                                case "active": return <FaCheckCircle className="text-green-600" />;
-                                case "closed": return <FaCheckCircle className="text-gray-600" />;
-                                case "pending": return <FaClock className="text-yellow-600" />;
-                                case "on_hold": return <FaPauseCircle className="text-orange-600" />;
-                                default: return <FaClock className="text-slate-600" />;
-                            }
-                        };
-                        const getStatusColor = () => {
-                            switch (c.status) {
-                                case "active": return "bg-green-100 text-green-800";
-                                case "closed": return "bg-gray-100 text-gray-800";
-                                case "pending": return "bg-yellow-100 text-yellow-800";
-                                case "on_hold": return "bg-orange-100 text-orange-800";
-                                default: return "bg-slate-100 text-slate-800";
-                            }
-                        };
-                        return (
-                            <div key={c.id} className="legal-card p-4 rounded-lg hover:shadow-lg transition-all group border border-slate-200">
-                                <div className="flex justify-between items-start mb-2">
-                                    <div className="flex-1 min-w-0">
-                                        <h3 className="text-base font-bold text-slate-900 group-hover:text-slate-700 mb-1 line-clamp-1">{c.title}</h3>
-                                        {c.caseNumber && (
-                                            <div className="flex items-center gap-1 text-xs text-slate-600">
-                                                <FaHashtag className="text-xs" /> {c.caseNumber}
+                <>
+                    {/* Success Toast Notification */}
+                    {successMessage && (
+                        <div className="fixed top-4 right-4 z-50 animate-slide-in-right bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 max-w-sm">
+                            <FaCheckCircle className="text-green-600 flex-shrink-0" />
+                            <span className="text-sm font-medium">{successMessage}</span>
+                            <button
+                                onClick={() => setSuccessMessage("")}
+                                className="ml-auto text-green-600 hover:text-green-800"
+                            >
+                                <FaTimes className="text-xs" />
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Error Message */}
+                    {error && (
+                        <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm mb-4">{error}</div>
+                    )}
+
+                    {filteredCases.length === 0 && localSearchQuery ? (
+                        <div className="text-center py-12 bg-white rounded-lg border-2 border-dashed border-slate-300">
+                            <FaSearch className="text-4xl text-slate-400 mx-auto mb-3" />
+                            <p className="text-slate-600 mb-2">No cases found matching "{localSearchQuery}"</p>
+                            <button
+                                onClick={() => {
+                                    setLocalSearchQuery("");
+                                    window.history.pushState({}, "", "/cases");
+                                }}
+                                className="text-amber-600 hover:text-amber-700 font-medium text-sm"
+                            >
+                                Clear search
+                            </button>
+                        </div>
+                    ) : cases.length === 0 ? (
+                        <div className="text-center py-8 bg-white rounded-lg border-2 border-dashed border-slate-300">
+                            <FaFileAlt className="text-4xl text-slate-400 mx-auto mb-3" />
+                            <p className="text-slate-600">No cases found. Create your first case!</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
+                            {filteredCases.map(c => {
+                                const getStatusIcon = () => {
+                                    switch (c.status) {
+                                        case "active": return <FaCheckCircle className="text-green-600" />;
+                                        case "closed": return <FaCheckCircle className="text-gray-600" />;
+                                        case "pending": return <FaClock className="text-yellow-600" />;
+                                        case "on_hold": return <FaPauseCircle className="text-orange-600" />;
+                                        default: return <FaClock className="text-slate-600" />;
+                                    }
+                                };
+                                const getStatusColor = () => {
+                                    switch (c.status) {
+                                        case "active": return "bg-green-100 text-green-800";
+                                        case "closed": return "bg-gray-100 text-gray-800";
+                                        case "pending": return "bg-yellow-100 text-yellow-800";
+                                        case "on_hold": return "bg-orange-100 text-orange-800";
+                                        default: return "bg-slate-100 text-slate-800";
+                                    }
+                                };
+                                const isDeleting = deletingCaseId === c.id;
+                                return (
+                                    <div
+                                        key={c.id}
+                                        className={`legal-card p-4 rounded-lg hover:shadow-lg transition-all group border border-slate-200 ${isDeleting ? 'opacity-0 scale-95 -translate-y-2 transition-all duration-300 pointer-events-none' : ''
+                                            }`}
+                                    >
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div className="flex-1 min-w-0">
+                                                <h3 className="text-base font-bold text-slate-900 group-hover:text-slate-700 mb-1 line-clamp-1">{c.title}</h3>
+                                                {c.caseNumber && (
+                                                    <div className="flex items-center gap-1 text-xs text-slate-600">
+                                                        <FaHashtag className="text-xs" /> {c.caseNumber}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className={`px-2 py-0.5 rounded text-xs font-semibold flex items-center gap-1 ml-2 flex-shrink-0 ${getStatusColor()}`}>
+                                                {getStatusIcon()}
+                                                <span className="capitalize hidden sm:inline">{c.status || "active"}</span>
+                                            </div>
+                                        </div>
+                                        <p className="text-slate-600 text-xs mb-3 line-clamp-2">{c.description}</p>
+
+                                        <div className="space-y-1 mb-3 text-xs text-slate-600">
+                                            {c.court && (
+                                                <div className="flex items-center gap-1.5 truncate">
+                                                    <FaBuilding className="text-amber-600 flex-shrink-0" /> <span className="truncate">{c.court}</span>
+                                                </div>
+                                            )}
+                                            {c.oppositeParty && (
+                                                <div className="flex items-center gap-1.5 truncate">
+                                                    <FaUser className="text-amber-600 flex-shrink-0" /> <span className="truncate">{c.oppositeParty}</span>
+                                                </div>
+                                            )}
+                                            {c.nextHearingDate && (
+                                                <div className="flex items-center gap-1.5">
+                                                    <FaCalendarAlt className="text-amber-600 flex-shrink-0" /> <span>Next: {new Date(c.nextHearingDate).toLocaleDateString()}</span>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Case Statistics */}
+                                        {caseStats[c.id] && (
+                                            <div className="flex items-center gap-3 mb-3 pt-2 border-t border-slate-100 text-xs">
+                                                <div className="flex items-center gap-1 text-slate-600" title="Documents">
+                                                    <FaFileAlt className="text-blue-600" />
+                                                    <span className="font-semibold">{caseStats[c.id].documents}</span>
+                                                </div>
+                                                <div className="flex items-center gap-1 text-slate-600" title="Hearings">
+                                                    <FaCalendarAlt className="text-green-600" />
+                                                    <span className="font-semibold">{caseStats[c.id].hearings}</span>
+                                                </div>
+                                                <div className="flex items-center gap-1 text-slate-600" title="Tasks">
+                                                    <FaTasks className="text-purple-600" />
+                                                    <span className="font-semibold">{caseStats[c.id].tasks}</span>
+                                                </div>
+                                                <div className="flex items-center gap-1 text-slate-600" title="Conversations">
+                                                    <FaComments className="text-amber-600" />
+                                                    <span className="font-semibold">{caseStats[c.id].conversations}</span>
+                                                </div>
                                             </div>
                                         )}
-                                    </div>
-                                    <div className={`px-2 py-0.5 rounded text-xs font-semibold flex items-center gap-1 ml-2 flex-shrink-0 ${getStatusColor()}`}>
-                                        {getStatusIcon()}
-                                        <span className="capitalize hidden sm:inline">{c.status || "active"}</span>
-                                    </div>
-                                </div>
-                                <p className="text-slate-600 text-xs mb-3 line-clamp-2">{c.description}</p>
 
-                                <div className="space-y-1 mb-3 text-xs text-slate-600">
-                                    {c.court && (
-                                        <div className="flex items-center gap-1.5 truncate">
-                                            <FaBuilding className="text-amber-600 flex-shrink-0" /> <span className="truncate">{c.court}</span>
-                                        </div>
-                                    )}
-                                    {c.oppositeParty && (
-                                        <div className="flex items-center gap-1.5 truncate">
-                                            <FaUser className="text-amber-600 flex-shrink-0" /> <span className="truncate">{c.oppositeParty}</span>
-                                        </div>
-                                    )}
-                                    {c.nextHearingDate && (
-                                        <div className="flex items-center gap-1.5">
-                                            <FaCalendarAlt className="text-amber-600 flex-shrink-0" /> <span>Next: {new Date(c.nextHearingDate).toLocaleDateString()}</span>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Case Statistics */}
-                                {caseStats[c.id] && (
-                                    <div className="flex items-center gap-3 mb-3 pt-2 border-t border-slate-100 text-xs">
-                                        <div className="flex items-center gap-1 text-slate-600" title="Documents">
-                                            <FaFileAlt className="text-blue-600" />
-                                            <span className="font-semibold">{caseStats[c.id].documents}</span>
-                                        </div>
-                                        <div className="flex items-center gap-1 text-slate-600" title="Hearings">
-                                            <FaCalendarAlt className="text-green-600" />
-                                            <span className="font-semibold">{caseStats[c.id].hearings}</span>
-                                        </div>
-                                        <div className="flex items-center gap-1 text-slate-600" title="Tasks">
-                                            <FaTasks className="text-purple-600" />
-                                            <span className="font-semibold">{caseStats[c.id].tasks}</span>
-                                        </div>
-                                        <div className="flex items-center gap-1 text-slate-600" title="Conversations">
-                                            <FaComments className="text-amber-600" />
-                                            <span className="font-semibold">{caseStats[c.id].conversations}</span>
+                                        <div className="flex gap-1 sm:gap-1.5 pt-3 border-t border-slate-200">
+                                            <Link href={`/cases/${c.id}`} className="flex-1 bg-slate-900 text-white rounded px-2 py-1.5 hover:bg-slate-800 transition font-medium text-xs text-center flex items-center justify-center gap-1">
+                                                <FaGavel className="text-xs" /> <span className="hidden sm:inline">View</span>
+                                            </Link>
+                                            <button
+                                                onClick={() => handleEdit(c)}
+                                                disabled={isDeleting}
+                                                className="flex-1 bg-amber-600 text-white rounded px-2 py-1.5 hover:bg-amber-700 transition font-medium text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                Edit
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete(c.id)}
+                                                disabled={isDeleting || deletingCaseId !== null}
+                                                className="flex-1 bg-red-600 text-white rounded px-2 py-1.5 hover:bg-red-700 transition font-medium text-xs flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                {isDeleting ? (
+                                                    <>
+                                                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                                                        <span className="hidden sm:inline">Deleting...</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <FaTrash className="text-xs" />
+                                                        <span className="hidden sm:inline">Del</span>
+                                                    </>
+                                                )}
+                                            </button>
                                         </div>
                                     </div>
-                                )}
-
-                                <div className="flex gap-1 sm:gap-1.5 pt-3 border-t border-slate-200">
-                                    <Link href={`/cases/${c.id}`} className="flex-1 bg-slate-900 text-white rounded px-2 py-1.5 hover:bg-slate-800 transition font-medium text-xs text-center flex items-center justify-center gap-1">
-                                        <FaGavel className="text-xs" /> <span className="hidden sm:inline">View</span>
-                                    </Link>
-                                    <button onClick={() => handleEdit(c)} className="flex-1 bg-amber-600 text-white rounded px-2 py-1.5 hover:bg-amber-700 transition font-medium text-xs">Edit</button>
-                                    <button onClick={() => handleDelete(c.id)} className="flex-1 bg-red-600 text-white rounded px-2 py-1.5 hover:bg-red-700 transition font-medium text-xs">Del</button>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </>
             )}
 
             {/* Modal */}

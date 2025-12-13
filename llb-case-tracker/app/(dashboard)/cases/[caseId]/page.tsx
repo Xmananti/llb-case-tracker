@@ -216,6 +216,17 @@ const CaseDetailsPage: React.FC = () => {
 const CaseDocumentsTab: React.FC<{ caseId: string }> = ({ caseId }) => {
     const { user } = useAuth();
     const db = getFirestore(app);
+
+    // Verify user is authenticated before making Firestore calls
+    if (!user) {
+        return (
+            <div className="bg-white rounded-lg shadow-md p-4">
+                <div className="text-center py-6 text-slate-500 text-sm">
+                    Please log in to view documents.
+                </div>
+            </div>
+        );
+    }
     const [docs, setDocs] = useState<(DocumentResource & { isImage?: boolean; isPDF?: boolean })[]>([]);
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
@@ -333,13 +344,38 @@ const CaseDocumentsTab: React.FC<{ caseId: string }> = ({ caseId }) => {
 
     // Handle delete
     const handleDelete = async (docId: string, filePath: string) => {
+        if (!user) {
+            setError("You must be logged in to delete documents.");
+            return;
+        }
+
+        if (!confirm("Are you sure you want to delete this document?")) {
+            return;
+        }
+
         try {
-            await deleteObject(ref(storage, filePath));
+            setError("");
+            // Delete from storage first
+            try {
+                await deleteObject(ref(storage, filePath));
+            } catch (storageError) {
+                console.warn("Error deleting from storage:", storageError);
+                // Continue to delete metadata even if storage delete fails
+            }
+
+            // Delete from Firestore
             await deleteDoc(fsDoc(db, "documents", docId));
             setDocs(prev => prev.filter(d => d.id !== docId));
         } catch (err: unknown) {
+            console.error("Error deleting document:", err);
             let message = "Delete failed";
-            if (err instanceof Error) message = err.message;
+            if (err instanceof Error) {
+                if (err.message.includes("permission") || err.message.includes("Missing") || err.message.includes("insufficient")) {
+                    message = "Permission denied. Please check Firebase security rules. See FIREBASE_SECURITY_RULES.md";
+                } else {
+                    message = err.message;
+                }
+            }
             setError(message);
         }
     };
@@ -482,6 +518,16 @@ const CaseDocumentsTab: React.FC<{ caseId: string }> = ({ caseId }) => {
 const CaseHearingsTab: React.FC<{ caseId: string }> = ({ caseId }) => {
     const { user } = useAuth();
     const db = getFirestore(app);
+
+    if (!user) {
+        return (
+            <div className="bg-white rounded-lg shadow-md p-4">
+                <div className="text-center py-6 text-slate-500 text-sm">
+                    Please log in to view hearings.
+                </div>
+            </div>
+        );
+    }
     const [hearings, setHearings] = useState<Hearing[]>([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
@@ -580,13 +626,29 @@ const CaseHearingsTab: React.FC<{ caseId: string }> = ({ caseId }) => {
         }
     };
     const handleDelete = async (id: string) => {
+        if (!user) {
+            setError("You must be logged in to delete hearings.");
+            return;
+        }
+
+        if (!confirm("Are you sure you want to delete this hearing?")) {
+            return;
+        }
+
         try {
             setError("");
             await deleteDoc(fsDoc(db, "hearings", id));
             setHearings(prev => prev.filter(h => h.id !== id));
         } catch (err) {
             console.error("Error deleting hearing:", err);
-            const errorMessage = err instanceof Error ? err.message : "Failed to delete hearing";
+            let errorMessage = "Failed to delete hearing";
+            if (err instanceof Error) {
+                if (err.message.includes("permission") || err.message.includes("Missing") || err.message.includes("insufficient")) {
+                    errorMessage = "Permission denied. Please check Firebase security rules. See FIREBASE_SECURITY_RULES.md";
+                } else {
+                    errorMessage = err.message;
+                }
+            }
             setError(errorMessage);
         }
     };
@@ -685,6 +747,16 @@ const CaseHearingsTab: React.FC<{ caseId: string }> = ({ caseId }) => {
 const CaseTasksTab: React.FC<{ caseId: string }> = ({ caseId }) => {
     const { user } = useAuth();
     const db = getFirestore(app);
+
+    if (!user) {
+        return (
+            <div className="bg-white rounded-lg shadow-md p-4">
+                <div className="text-center py-6 text-slate-500 text-sm">
+                    Please log in to view tasks.
+                </div>
+            </div>
+        );
+    }
     const [tasks, setTasks] = useState<Task[]>([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
@@ -787,13 +859,29 @@ const CaseTasksTab: React.FC<{ caseId: string }> = ({ caseId }) => {
         }
     };
     const handleDelete = async (id: string) => {
+        if (!user) {
+            setError("You must be logged in to delete tasks.");
+            return;
+        }
+
+        if (!confirm("Are you sure you want to delete this task?")) {
+            return;
+        }
+
         try {
             setError("");
             await deleteDoc(fsDoc(db, "tasks", id));
             setTasks(prev => prev.filter(t => t.id !== id));
         } catch (err) {
             console.error("Error deleting task:", err);
-            const errorMessage = err instanceof Error ? err.message : "Failed to delete task";
+            let errorMessage = "Failed to delete task";
+            if (err instanceof Error) {
+                if (err.message.includes("permission") || err.message.includes("Missing") || err.message.includes("insufficient")) {
+                    errorMessage = "Permission denied. Please check Firebase security rules. See FIREBASE_SECURITY_RULES.md";
+                } else {
+                    errorMessage = err.message;
+                }
+            }
             setError(errorMessage);
         }
     };
@@ -917,6 +1005,16 @@ interface Message {
 const CaseConversationsTab: React.FC<{ caseId: string }> = ({ caseId }) => {
     const { user } = useAuth();
     const db = getFirestore(app);
+
+    if (!user) {
+        return (
+            <div className="bg-white rounded-lg shadow-md p-4">
+                <div className="text-center py-6 text-slate-500 text-sm">
+                    Please log in to view conversations.
+                </div>
+            </div>
+        );
+    }
     const [messages, setMessages] = useState<Message[]>([]);
     const [loading, setLoading] = useState(true);
     const [newMessage, setNewMessage] = useState("");

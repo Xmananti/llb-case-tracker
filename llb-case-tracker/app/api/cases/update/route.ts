@@ -14,6 +14,7 @@ const schema = z.object({
   filingDate: z.string().optional(),
   nextHearingDate: z.string().optional(),
   userId: z.string(),
+  organizationId: z.string().optional(), // Optional for updates, but should match existing
 });
 
 export async function PATCH(req: NextRequest) {
@@ -51,7 +52,7 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    const updateData = {
+    const updateData: any = {
       title,
       description,
       caseNumber: caseNumber || "",
@@ -66,6 +67,11 @@ export async function PATCH(req: NextRequest) {
       userId: existingCase.userId,
       createdAt: existingCase.createdAt,
     };
+
+    // Preserve organizationId if it exists
+    if (existingCase.organizationId) {
+      updateData.organizationId = existingCase.organizationId;
+    }
 
     await caseRef.update(updateData);
 

@@ -19,7 +19,7 @@ interface CaseDoc {
 }
 
 const DashboardHome: React.FC = () => {
-    const { user } = useAuth();
+    const { user, userData, loading: authLoading } = useAuth();
     const router = useRouter();
     const [cases, setCases] = useState<CaseDoc[]>([]);
     const [loading, setLoading] = useState(true);
@@ -33,11 +33,16 @@ const DashboardHome: React.FC = () => {
             setLoading(false);
             return;
         }
+        // Wait for auth to finish loading
+        if (authLoading) {
+            return;
+        }
         const fetchCases = async () => {
             setLoading(true);
             setError("");
             try {
-                const data = await getCases(user.uid) as Array<{
+                // Always pass userId, organizationId is optional
+                const data = await getCases(user.uid, userData?.organizationId) as Array<{
                     id: string;
                     title: string;
                     description: string;
@@ -62,22 +67,28 @@ const DashboardHome: React.FC = () => {
 
                 setCases(casesData);
 
-                // Sort by updatedAt (most recent first) and take top 5
+                // Sort by updatedAt (most recent first) and take top 2
                 const sorted = [...casesData].sort((a, b) => {
                     const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
                     const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
                     return bTime - aTime;
                 });
-                setRecentCases(sorted.slice(0, 5));
+                setRecentCases(sorted.slice(0, 2));
             } catch (err) {
                 console.error("Error fetching cases:", err);
-                setError("Failed to fetch cases");
+                const errorMessage = err instanceof Error ? err.message : "Failed to fetch cases";
+                // If user has no organization, show helpful message
+                if (!userData?.organizationId) {
+                    setError("No organization assigned. Your cases may not be visible. Please contact your administrator.");
+                } else {
+                    setError(errorMessage);
+                }
             } finally {
                 setLoading(false);
             }
         };
         fetchCases();
-    }, [user]);
+    }, [user, userData]);
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
@@ -243,7 +254,7 @@ const DashboardHome: React.FC = () => {
                                                     cx="50%"
                                                     cy="50%"
                                                     labelLine={false}
-                                                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                                                    label={({ name, percent }) => `${name}: ${((percent || 0) * 100).toFixed(0)}%`}
                                                     outerRadius={80}
                                                     fill="#8884d8"
                                                     dataKey="value"
@@ -284,12 +295,12 @@ const DashboardHome: React.FC = () => {
                                                         <span className="text-xs sm:text-sm font-medium text-amber-700">{hearing.date}</span>
                                                         <span
                                                             className={`px-2 py-0.5 rounded-full text-xs font-medium ${hearing.status === "active"
-                                                                    ? "bg-green-100 text-green-800"
-                                                                    : hearing.status === "pending"
-                                                                        ? "bg-yellow-100 text-yellow-800"
-                                                                        : hearing.status === "on_hold"
-                                                                            ? "bg-orange-100 text-orange-800"
-                                                                            : "bg-gray-100 text-gray-800"
+                                                                ? "bg-green-100 text-green-800"
+                                                                : hearing.status === "pending"
+                                                                    ? "bg-yellow-100 text-yellow-800"
+                                                                    : hearing.status === "on_hold"
+                                                                        ? "bg-orange-100 text-orange-800"
+                                                                        : "bg-gray-100 text-gray-800"
                                                                 }`}
                                                         >
                                                             {hearing.status}
@@ -432,36 +443,6 @@ const DashboardHome: React.FC = () => {
                             <p className="mt-2 text-slate-600 text-sm">Loading cases...</p>
                         </div>
                     )}
-                </div>
-            </div>
-
-            {/* Bottom Search Bar (Google Style) */}
-            <div className="bg-white border-t border-slate-200 px-4 py-4 sm:py-6">
-                <div className="max-w-2xl mx-auto">
-                    <form onSubmit={handleSearch} className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3 sm:pl-4 flex items-center pointer-events-none">
-                            <FaSearch className="text-slate-400 text-base sm:text-lg" />
-                        </div>
-                        <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Search cases..."
-                            className="w-full pl-10 sm:pl-12 pr-4 py-2.5 sm:py-3 text-sm sm:text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent shadow-sm"
-                        />
-                        {searchQuery && (
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setSearchQuery("");
-                                    searchInputRef.current?.focus();
-                                }}
-                                className="absolute inset-y-0 right-0 pr-3 sm:pr-4 flex items-center text-slate-400 hover:text-slate-600"
-                            >
-                                <span className="text-xl">×</span>
-                            </button>
-                        )}
-                    </form>
                 </div>
             </div>
         </div>

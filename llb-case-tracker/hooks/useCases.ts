@@ -14,7 +14,7 @@ interface Case {
 }
 
 export const useCases = () => {
-  const { user } = useAuth();
+  const { user, userData } = useAuth();
   const [cases, setCases] = useState<Case[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,14 +27,14 @@ export const useCases = () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await getCases(user.uid);
+      const data = await getCases(user.uid, userData?.organizationId);
       setCases(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch cases");
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, userData?.organizationId]);
 
   useEffect(() => {
     fetchCases();
@@ -42,8 +42,14 @@ export const useCases = () => {
 
   const addCase = async (title: string, description: string) => {
     if (!user) throw new Error("Not authenticated");
+    if (!userData?.organizationId) throw new Error("No organization assigned");
     try {
-      await createCase({ title, description, userId: user.uid });
+      await createCase({
+        title,
+        description,
+        userId: user.uid,
+        organizationId: userData.organizationId,
+      });
       await fetchCases();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create case");
@@ -54,7 +60,13 @@ export const useCases = () => {
   const editCase = async (id: string, title: string, description: string) => {
     if (!user) throw new Error("Not authenticated");
     try {
-      await updateCase({ id, title, description, userId: user.uid });
+      await updateCase({
+        id,
+        title,
+        description,
+        userId: user.uid,
+        organizationId: userData?.organizationId,
+      });
       await fetchCases();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update case");
@@ -65,7 +77,11 @@ export const useCases = () => {
   const removeCase = async (id: string) => {
     if (!user) throw new Error("Not authenticated");
     try {
-      await deleteCase({ id, userId: user.uid });
+      await deleteCase({
+        id,
+        userId: user.uid,
+        organizationId: userData?.organizationId,
+      });
       setCases((prev) => prev.filter((c) => c.id !== id));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete case");

@@ -2,7 +2,7 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FaChartBar, FaFolder, FaUser, FaTimes } from "react-icons/fa";
+import { FaChartBar, FaFolder, FaUser, FaTimes, FaBuilding } from "react-icons/fa";
 
 interface SidebarProps {
     isOpen?: boolean;
@@ -15,6 +15,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => {
     const links = [
         { href: "/dashboard", label: "Dashboard", icon: FaChartBar },
         { href: "/cases", label: "Cases", icon: FaFolder },
+        // { href: "/admin", label: "Admin", icon: FaBuilding }, // Hidden for now
         { href: "/profile", label: "Profile", icon: FaUser },
     ];
 

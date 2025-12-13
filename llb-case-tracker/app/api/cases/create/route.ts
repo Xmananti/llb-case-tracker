@@ -13,6 +13,7 @@ const caseSchema = z.object({
   filingDate: z.string().optional(),
   nextHearingDate: z.string().optional(),
   userId: z.string(),
+  organizationId: z.string(), // Required for multi-tenancy
 });
 
 export async function POST(req: NextRequest) {
@@ -35,9 +36,44 @@ export async function POST(req: NextRequest) {
     filingDate,
     nextHearingDate,
     userId,
+    organizationId,
   } = parse.data;
 
   try {
+    // Verify organization exists and check case limits
+    const orgRef = adminDb.ref(`organizations/${organizationId}`);
+    const orgSnapshot = await orgRef.once("value");
+    const orgData = orgSnapshot.val();
+
+    if (!orgData) {
+      return NextResponse.json(
+        { error: "Organization not found" },
+        { status: 404 }
+      );
+    }
+
+    // Check subscription status
+    if (
+      orgData.subscriptionStatus === "expired" ||
+      orgData.subscriptionStatus === "cancelled"
+    ) {
+      return NextResponse.json(
+        { error: "Organization subscription is expired or cancelled" },
+        { status: 403 }
+      );
+    }
+
+    // Check case limit
+    const maxCases = orgData.maxCases || 0;
+    const currentCases = orgData.currentCases || 0;
+
+    if (maxCases > 0 && currentCases >= maxCases) {
+      return NextResponse.json(
+        { error: "Organization has reached maximum case limit" },
+        { status: 403 }
+      );
+    }
+
     const casesRef = adminDb.ref("cases");
     const newCaseRef = casesRef.push();
 
@@ -52,11 +88,18 @@ export async function POST(req: NextRequest) {
       filingDate: filingDate || "",
       nextHearingDate: nextHearingDate || "",
       userId,
+      organizationId, // Added for multi-tenancy
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
     await newCaseRef.set(caseData);
+
+    // Increment organization case count
+    await orgRef.update({
+      currentCases: currentCases + 1,
+      updatedAt: new Date().toISOString(),
+    });
 
     return NextResponse.json(
       {

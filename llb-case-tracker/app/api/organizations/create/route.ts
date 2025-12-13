@@ -9,7 +9,9 @@ const organizationSchema = z.object({
   phone: z.string().optional(),
   address: z.string().optional(),
   domain: z.string().optional(),
-  subscriptionPlan: z.enum(["free", "starter", "professional", "enterprise"]).default("free"),
+  subscriptionPlan: z
+    .enum(["free", "starter", "professional", "enterprise"])
+    .default("free"),
   createdBy: z.string(), // Admin user ID
 });
 
@@ -25,21 +27,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const {
-      name,
-      email,
-      phone,
-      address,
-      domain,
-      subscriptionPlan,
-      createdBy,
-    } = parse.data;
+    const { name, email, phone, address, domain, subscriptionPlan, createdBy } =
+      parse.data;
 
     const plan = SUBSCRIPTION_PLANS[subscriptionPlan];
     const now = new Date();
-    const trialEndDate = plan.trialDays > 0
-      ? new Date(now.getTime() + plan.trialDays * 24 * 60 * 60 * 1000).toISOString()
-      : undefined;
+    const trialEndDate =
+      plan.trialDays > 0
+        ? new Date(
+            now.getTime() + plan.trialDays * 24 * 60 * 60 * 1000
+          ).toISOString()
+        : undefined;
 
     const organizationData = {
       name,
