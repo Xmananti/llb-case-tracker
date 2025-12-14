@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb } from "../../../../../../lib/firebase/admin";
+import { adminDb } from "@/lib/firebase/admin";
 import { z } from "zod";
 
 const paymentSchema = z.object({

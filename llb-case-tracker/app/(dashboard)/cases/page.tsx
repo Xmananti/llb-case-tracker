@@ -223,7 +223,12 @@ const CasesPage: React.FC = () => {
                 c.description?.toLowerCase().includes(localSearchQuery.toLowerCase()) ||
                 c.caseNumber?.toLowerCase().includes(localSearchQuery.toLowerCase()) ||
                 c.court?.toLowerCase().includes(localSearchQuery.toLowerCase()) ||
-                c.oppositeParty?.toLowerCase().includes(localSearchQuery.toLowerCase())
+                c.plaintiff?.toLowerCase().includes(localSearchQuery.toLowerCase()) ||
+                c.defendant?.toLowerCase().includes(localSearchQuery.toLowerCase()) ||
+                c.petitioner?.toLowerCase().includes(localSearchQuery.toLowerCase()) ||
+                c.respondent?.toLowerCase().includes(localSearchQuery.toLowerCase()) ||
+                c.complainant?.toLowerCase().includes(localSearchQuery.toLowerCase()) ||
+                c.accused?.toLowerCase().includes(localSearchQuery.toLowerCase())
             );
             setFilteredCases(filtered);
         } else {
@@ -693,19 +698,29 @@ const CasesPage: React.FC = () => {
                             {filteredCases.map(c => {
                                 const getStatusIcon = () => {
                                     switch (c.status) {
-                                        case "active": return <FaCheckCircle className="text-green-600" />;
-                                        case "closed": return <FaCheckCircle className="text-gray-600" />;
+                                        case "admitted":
+                                        case "allowed": return <FaCheckCircle className="text-green-600" />;
+                                        case "dismissed": return <FaTimes className="text-red-600" />;
+                                        case "disposed": return <FaCheckCircle className="text-gray-600" />;
+                                        case "withdrawn": return <FaClock className="text-orange-600" />;
+                                        case "compromised": return <FaCheckCircle className="text-blue-600" />;
+                                        case "stayed": return <FaPauseCircle className="text-yellow-600" />;
+                                        case "appeal_filed": return <FaFileAlt className="text-purple-600" />;
                                         case "pending": return <FaClock className="text-yellow-600" />;
-                                        case "on_hold": return <FaPauseCircle className="text-orange-600" />;
                                         default: return <FaClock className="text-slate-600" />;
                                     }
                                 };
                                 const getStatusColor = () => {
                                     switch (c.status) {
-                                        case "active": return "bg-green-100 text-green-800";
-                                        case "closed": return "bg-gray-100 text-gray-800";
+                                        case "admitted":
+                                        case "allowed": return "bg-green-100 text-green-800";
+                                        case "dismissed": return "bg-red-100 text-red-800";
+                                        case "disposed": return "bg-gray-100 text-gray-800";
+                                        case "withdrawn": return "bg-orange-100 text-orange-800";
+                                        case "compromised": return "bg-blue-100 text-blue-800";
+                                        case "stayed": return "bg-yellow-100 text-yellow-800";
+                                        case "appeal_filed": return "bg-purple-100 text-purple-800";
                                         case "pending": return "bg-yellow-100 text-yellow-800";
-                                        case "on_hold": return "bg-orange-100 text-orange-800";
                                         default: return "bg-slate-100 text-slate-800";
                                     }
                                 };

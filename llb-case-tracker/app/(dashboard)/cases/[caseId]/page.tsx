@@ -10,7 +10,7 @@ import type { Timestamp as TTimestamp } from "firebase/firestore";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { FaFileAlt, FaCalendarAlt, FaUser, FaBuilding, FaHashtag, FaTag, FaCheckCircle, FaClock, FaPauseCircle, FaUpload, FaTrash, FaDownload, FaEdit, FaFilePdf, FaComments, FaPaperPlane, FaEye, FaArrowLeft } from "react-icons/fa";
+import { FaFileAlt, FaCalendarAlt, FaUser, FaBuilding, FaHashtag, FaTag, FaCheckCircle, FaClock, FaPauseCircle, FaUpload, FaTrash, FaDownload, FaEdit, FaFilePdf, FaComments, FaPaperPlane, FaEye, FaArrowLeft, FaTimes } from "react-icons/fa";
 
 interface DocumentResource {
     id: string;
@@ -222,12 +222,6 @@ const CaseDetailsPage: React.FC = () => {
                                         <div className="flex items-center gap-2 text-slate-700">
                                             <FaUser className="text-amber-600" />
                                             <span className="font-semibold">Defendant:</span> {caseData.defendant}
-                                        </div>
-                                    )}
-                                    {caseData.advocates && (
-                                        <div className="flex items-center gap-2 text-slate-700">
-                                            <FaUser className="text-amber-600" />
-                                            <span className="font-semibold">Advocate(s):</span> {caseData.advocates}
                                         </div>
                                     )}
                                     {caseData.currentStage && (
