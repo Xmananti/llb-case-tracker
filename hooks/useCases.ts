@@ -27,14 +27,14 @@ export const useCases = () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await getCases(user.uid, userData?.organizationId);
+      const data = await getCases(user.uid);
       setCases(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch cases");
     } finally {
       setLoading(false);
     }
-  }, [user, userData?.organizationId]);
+  }, [user]);
 
   useEffect(() => {
     fetchCases();
@@ -42,13 +42,11 @@ export const useCases = () => {
 
   const addCase = async (title: string, description: string) => {
     if (!user) throw new Error("Not authenticated");
-    if (!userData?.organizationId) throw new Error("No organization assigned");
     try {
       await createCase({
         title,
         description,
         userId: user.uid,
-        organizationId: userData.organizationId,
       });
       await fetchCases();
     } catch (err) {
@@ -65,7 +63,6 @@ export const useCases = () => {
         title,
         description,
         userId: user.uid,
-        organizationId: userData?.organizationId,
       });
       await fetchCases();
     } catch (err) {
@@ -80,7 +77,6 @@ export const useCases = () => {
       await deleteCase({
         id,
         userId: user.uid,
-        organizationId: userData?.organizationId,
       });
       setCases((prev) => prev.filter((c) => c.id !== id));
     } catch (err) {

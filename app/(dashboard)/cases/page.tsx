@@ -2,8 +2,9 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../../../context/AuthContext";
 import { getCases, createCase, updateCase, deleteCase } from "../../../lib/api-client";
+import { createClient, getClients } from "../../../lib/api-client";
 import { uploadCaseDocument } from "../../../lib/firebase/storage";
-import { FaGavel, FaFileAlt, FaCalendarAlt, FaUser, FaBuilding, FaHashtag, FaCheckCircle, FaClock, FaPauseCircle, FaUpload, FaTimes, FaComments, FaTasks, FaSearch, FaTrash } from "react-icons/fa";
+import { FaGavel, FaFileAlt, FaCalendarAlt, FaUser, FaBuilding, FaHashtag, FaCheckCircle, FaClock, FaPauseCircle, FaUpload, FaTimes, FaComments, FaTasks, FaSearch, FaTrash, FaArrowLeft } from "react-icons/fa";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
@@ -38,7 +39,7 @@ interface Case {
 }
 
 const CasesPage: React.FC = () => {
-    const { user, userData } = useAuth();
+    const { user, userData, refreshUserData } = useAuth();
     const searchParams = useSearchParams();
     const searchQuery = searchParams?.get("search") || "";
     const [cases, setCases] = useState<Case[]>([]);
@@ -117,7 +118,7 @@ const CasesPage: React.FC = () => {
         const fetchCases = async () => {
             setLoading(true);
             try {
-                const res = await getCases(user.uid, userData?.organizationId);
+                const res = await getCases(user.uid);
                 setCases(res);
                 setError("");
 
@@ -192,17 +193,12 @@ const CasesPage: React.FC = () => {
                 setCaseStats(statsMap);
             } catch (err) {
                 const errorMessage = err instanceof Error ? err.message : "Failed to fetch cases";
-                // If user has no organization, show helpful message
-                if (!userData?.organizationId) {
-                    setError("No organization assigned. Your cases may not be visible. Please contact your administrator to be added to an organization.");
-                } else {
-                    setError(errorMessage);
-                }
+                setError(errorMessage);
             }
             setLoading(false);
         };
         fetchCases();
-    }, [user, userData?.organizationId, searchQuery]);
+    }, [user, searchQuery]);
 
     // Update local search when URL param changes
     useEffect(() => {
@@ -214,6 +210,48 @@ const CasesPage: React.FC = () => {
             setLocalSearchQuery("");
         }
     }, [searchParams]);
+
+    // Check if "new" query parameter is present to open the modal
+    useEffect(() => {
+        if (searchParams?.get("new") === "true" && user) {
+            // Reset form and open modal
+            setEditId(null);
+            setForm({
+                title: "",
+                description: "",
+                caseNumber: "",
+                caseCategory: "",
+                court: "",
+                courtComplex: "",
+                benchJudgeName: "",
+                plaintiff: "",
+                defendant: "",
+                petitioner: "",
+                respondent: "",
+                complainant: "",
+                accused: "",
+                advocateForPetitioner: "",
+                advocateForRespondent: "",
+                publicProsecutor: "",
+                seniorCounsel: "",
+                vakalatFiled: false,
+                currentStage: "",
+                lastHearingDate: "",
+                nextHearingDate: "",
+                hearingPurpose: "",
+                notes: "",
+                caseType: "",
+                status: "pending",
+                filingDate: "",
+            });
+            setSelectedFiles([]);
+            setShowModal(true);
+            // Remove the query parameter from URL without reload
+            const url = new URL(window.location.href);
+            url.searchParams.delete("new");
+            window.history.replaceState({}, "", url.pathname + url.search);
+        }
+    }, [searchParams, user]);
 
     // Filter cases based on local search query
     useEffect(() => {
@@ -255,19 +293,25 @@ const CasesPage: React.FC = () => {
             setError("You must be logged in to create cases.");
             return;
         }
-        if (!userData?.organizationId) {
-            setError("No organization assigned. Please contact your administrator to be added to an organization.");
-            setUploading(false);
-            return;
-        }
+        // If no organization, try to get one (will be auto-assigned by API)
+        // Don't block case creation - let the API handle organization assignment
         setUploading(true);
         setError("");
         try {
             let newCaseId: string | undefined;
+            // Prepare form data, ensuring status is valid
+            const validStatuses = ["pending", "admitted", "dismissed", "allowed", "disposed", "withdrawn", "compromised", "stayed", "appeal_filed"];
+            const caseData = {
+                ...form,
+                userId: user.uid,
+                // Ensure status is valid or undefined
+                status: form.status && validStatuses.includes(form.status) ? form.status : "pending"
+            };
+
             if (editId) {
-                await updateCase({ id: editId, ...form, userId: user.uid, organizationId: userData.organizationId });
+                await updateCase({ id: editId, ...caseData });
             } else {
-                const result = await createCase({ ...form, userId: user.uid, organizationId: userData.organizationId });
+                const result = await createCase(caseData);
                 newCaseId = result.id;
             }
 
@@ -356,8 +400,14 @@ const CasesPage: React.FC = () => {
             setSelectedFiles([]);
             setUploadProgress({});
             setEditId(null);
+
+            // Remove focus from any active element to prevent text selection
+            if (document.activeElement instanceof HTMLElement) {
+                document.activeElement.blur();
+            }
+
             // Refresh
-            const res = await getCases(user.uid, userData?.organizationId);
+            const res = await getCases(user.uid);
             setCases(res);
 
             // Refresh statistics
@@ -391,7 +441,13 @@ const CasesPage: React.FC = () => {
                 }
             }
         } catch (err) {
-            setError("Could not save case");
+            let errorMessage = "Could not save case";
+            if (err instanceof Error) {
+                errorMessage = err.message;
+            } else if (typeof err === "string") {
+                errorMessage = err;
+            }
+            setError(errorMessage);
             console.error("Error saving case:", err);
         } finally {
             setUploading(false);
@@ -447,11 +503,9 @@ const CasesPage: React.FC = () => {
         setSuccessMessage("");
 
         try {
-            // organizationId is optional - allows deletion of legacy cases (without organizationId)
             await deleteCase({
                 id,
                 userId: user.uid,
-                organizationId: userData?.organizationId
             });
 
             // Show success message
@@ -726,9 +780,10 @@ const CasesPage: React.FC = () => {
                                 };
                                 const isDeleting = deletingCaseId === c.id;
                                 return (
-                                    <div
+                                    <Link
                                         key={c.id}
-                                        className={`legal-card p-4 rounded-lg hover:shadow-lg transition-all group border border-slate-200 ${isDeleting ? 'opacity-0 scale-95 -translate-y-2 transition-all duration-300 pointer-events-none' : ''
+                                        href={`/cases/${c.id}`}
+                                        className={`legal-card p-4 rounded-lg hover:shadow-lg transition-all group border border-slate-200 block cursor-pointer ${isDeleting ? 'opacity-0 scale-95 -translate-y-2 transition-all duration-300 pointer-events-none' : ''
                                             }`}
                                     >
                                         <div className="flex justify-between items-start mb-2">
@@ -791,21 +846,38 @@ const CasesPage: React.FC = () => {
                                             </div>
                                         )}
 
-                                        <div className="flex gap-1 sm:gap-1.5 pt-3 border-t border-slate-200">
-                                            <Link href={`/cases/${c.id}`} className="flex-1 bg-slate-900 text-white rounded px-2 py-1.5 hover:bg-slate-800 transition font-medium text-xs text-center flex items-center justify-center gap-1">
-                                                <FaGavel className="text-xs" /> <span className="hidden sm:inline">View</span>
-                                            </Link>
+                                        <div className="flex gap-1 sm:gap-1.5 pt-3 border-t border-slate-200" onClick={(e) => e.stopPropagation()}>
                                             <button
-                                                onClick={() => handleEdit(c)}
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    window.location.href = `/cases/${c.id}`;
+                                                }}
+                                                className="flex-1 bg-slate-900 text-white rounded px-2 py-1.5 hover:bg-slate-800 transition font-medium text-xs text-center flex items-center justify-center gap-1 select-none"
+                                            >
+                                                <FaGavel className="text-xs" /> <span className="hidden sm:inline">View</span>
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    handleEdit(c);
+                                                }}
                                                 disabled={isDeleting}
-                                                className="flex-1 bg-amber-600 text-white rounded px-2 py-1.5 hover:bg-amber-700 transition font-medium text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="flex-1 bg-amber-600 text-white rounded px-2 py-1.5 hover:bg-amber-700 transition font-medium text-xs disabled:opacity-50 disabled:cursor-not-allowed select-none"
+                                                onMouseDown={(e) => e.preventDefault()}
                                             >
                                                 Edit
                                             </button>
                                             <button
-                                                onClick={() => handleDelete(c.id)}
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    handleDelete(c.id);
+                                                }}
                                                 disabled={isDeleting || deletingCaseId !== null}
-                                                className="flex-1 bg-red-600 text-white rounded px-2 py-1.5 hover:bg-red-700 transition font-medium text-xs flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="flex-1 bg-red-600 text-white rounded px-2 py-1.5 hover:bg-red-700 transition font-medium text-xs flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed select-none"
+                                                onMouseDown={(e) => e.preventDefault()}
                                             >
                                                 {isDeleting ? (
                                                     <>
@@ -820,7 +892,7 @@ const CasesPage: React.FC = () => {
                                                 )}
                                             </button>
                                         </div>
-                                    </div>
+                                    </Link>
                                 );
                             })}
                         </div>
@@ -835,9 +907,24 @@ const CasesPage: React.FC = () => {
                         onSubmit={handleAddOrUpdate}
                         className="bg-white rounded-lg p-4 sm:p-6 shadow-2xl space-y-3 w-full max-w-2xl border-t-4 border-amber-500 my-2 sm:my-4 max-h-[95vh] overflow-y-auto"
                     >
-                        <h2 className="text-lg sm:text-xl font-bold text-slate-900 mb-3 sm:mb-4 flex items-center gap-2">
-                            <FaFileAlt className="text-amber-600" /> <span className="text-sm sm:text-lg">{editId ? "Edit Case" : "Add New Case"}</span>
-                        </h2>
+                        <div className="flex items-center justify-between mb-3 sm:mb-4">
+                            <h2 className="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-2">
+                                <FaFileAlt className="text-amber-600" /> <span className="text-sm sm:text-lg">{editId ? "Edit Case" : "Add New Case"}</span>
+                            </h2>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowModal(false);
+                                    setSelectedFiles([]);
+                                    setEditId(null);
+                                }}
+                                className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-all flex items-center gap-2"
+                                title="Go back"
+                            >
+                                <FaArrowLeft className="text-sm" />
+                                <span className="text-sm font-medium hidden sm:inline">Back</span>
+                            </button>
+                        </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                             <div className="md:col-span-2">
                                 <label className="block text-xs font-semibold text-slate-700 mb-1">Case Title *</label>
@@ -850,7 +937,7 @@ const CasesPage: React.FC = () => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-semibold text-slate-700 mb-1">Case Number</label>
+                                <label className="block text-xs font-semibold text-slate-700 mb-1">Case Number <span className="text-slate-500 font-normal">(Optional)</span></label>
                                 <input
                                     className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
                                     value={form.caseNumber}
@@ -859,7 +946,7 @@ const CasesPage: React.FC = () => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Case Type</label>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">Case Type <span className="text-slate-500 font-normal text-xs">(Optional)</span></label>
                                 <select
                                     className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
                                     value={form.caseType}
@@ -875,7 +962,7 @@ const CasesPage: React.FC = () => {
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Case Category</label>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">Case Category <span className="text-slate-500 font-normal text-xs">(Optional)</span></label>
                                 <select
                                     className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
                                     value={form.caseCategory}
@@ -894,7 +981,7 @@ const CasesPage: React.FC = () => {
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Court Name</label>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">Court Name <span className="text-slate-500 font-normal text-xs">(Optional)</span></label>
                                 <input
                                     className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
                                     value={form.court}
@@ -903,7 +990,7 @@ const CasesPage: React.FC = () => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Court Complex</label>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">Court Complex <span className="text-slate-500 font-normal text-xs">(Optional)</span></label>
                                 <input
                                     className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
                                     value={form.courtComplex}
@@ -912,7 +999,7 @@ const CasesPage: React.FC = () => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Bench / Judge Name</label>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">Bench / Judge Name <span className="text-slate-500 font-normal text-xs">(Optional)</span></label>
                                 <input
                                     className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
                                     value={form.benchJudgeName}
@@ -921,12 +1008,12 @@ const CasesPage: React.FC = () => {
                                 />
                             </div>
                             <div className="md:col-span-2">
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Parties</label>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">Parties <span className="text-slate-500 font-normal text-xs">(Optional)</span></label>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     {(form.caseType === "Civil" || !form.caseType) && (
                                         <>
                                             <div>
-                                                <label className="block text-xs text-slate-600 mb-1">Plaintiff</label>
+                                                <label className="block text-xs text-slate-600 mb-1">Plaintiff <span className="text-slate-400">(Optional)</span></label>
                                                 <input
                                                     className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
                                                     value={form.plaintiff}
@@ -935,7 +1022,7 @@ const CasesPage: React.FC = () => {
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-xs text-slate-600 mb-1">Defendant</label>
+                                                <label className="block text-xs text-slate-600 mb-1">Defendant <span className="text-slate-400">(Optional)</span></label>
                                                 <input
                                                     className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
                                                     value={form.defendant}
@@ -948,7 +1035,7 @@ const CasesPage: React.FC = () => {
                                     {(form.caseType === "Writ Petition" || form.caseType === "Appeal" || form.caseType === "Revision") && (
                                         <>
                                             <div>
-                                                <label className="block text-xs text-slate-600 mb-1">Petitioner</label>
+                                                <label className="block text-xs text-slate-600 mb-1">Petitioner <span className="text-slate-400">(Optional)</span></label>
                                                 <input
                                                     className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
                                                     value={form.petitioner}
@@ -957,7 +1044,7 @@ const CasesPage: React.FC = () => {
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-xs text-slate-600 mb-1">Respondent</label>
+                                                <label className="block text-xs text-slate-600 mb-1">Respondent <span className="text-slate-400">(Optional)</span></label>
                                                 <input
                                                     className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
                                                     value={form.respondent}
@@ -970,7 +1057,7 @@ const CasesPage: React.FC = () => {
                                     {form.caseType === "Criminal" && (
                                         <>
                                             <div>
-                                                <label className="block text-xs text-slate-600 mb-1">Complainant</label>
+                                                <label className="block text-xs text-slate-600 mb-1">Complainant <span className="text-slate-400">(Optional)</span></label>
                                                 <input
                                                     className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
                                                     value={form.complainant}
@@ -979,7 +1066,7 @@ const CasesPage: React.FC = () => {
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-xs text-slate-600 mb-1">Accused</label>
+                                                <label className="block text-xs text-slate-600 mb-1">Accused <span className="text-slate-400">(Optional)</span></label>
                                                 <input
                                                     className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
                                                     value={form.accused}
@@ -992,12 +1079,12 @@ const CasesPage: React.FC = () => {
                                 </div>
                             </div>
                             <div className="md:col-span-2">
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Advocate Details</label>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">Advocate Details <span className="text-slate-500 font-normal text-xs">(Optional)</span></label>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     {(form.caseType === "Civil" || !form.caseType) && (
                                         <>
                                             <div>
-                                                <label className="block text-xs text-slate-600 mb-1">Advocate for Plaintiff</label>
+                                                <label className="block text-xs text-slate-600 mb-1">Advocate for Plaintiff <span className="text-slate-400">(Optional)</span></label>
                                                 <input
                                                     className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
                                                     value={form.advocateForPetitioner}
@@ -1006,7 +1093,7 @@ const CasesPage: React.FC = () => {
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-xs text-slate-600 mb-1">Advocate for Defendant</label>
+                                                <label className="block text-xs text-slate-600 mb-1">Advocate for Defendant <span className="text-slate-400">(Optional)</span></label>
                                                 <input
                                                     className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
                                                     value={form.advocateForRespondent}
@@ -1019,7 +1106,7 @@ const CasesPage: React.FC = () => {
                                     {(form.caseType === "Writ Petition" || form.caseType === "Appeal" || form.caseType === "Revision") && (
                                         <>
                                             <div>
-                                                <label className="block text-xs text-slate-600 mb-1">Advocate for Petitioner</label>
+                                                <label className="block text-xs text-slate-600 mb-1">Advocate for Petitioner <span className="text-slate-400">(Optional)</span></label>
                                                 <input
                                                     className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
                                                     value={form.advocateForPetitioner}
@@ -1028,7 +1115,7 @@ const CasesPage: React.FC = () => {
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-xs text-slate-600 mb-1">Advocate for Respondent</label>
+                                                <label className="block text-xs text-slate-600 mb-1">Advocate for Respondent <span className="text-slate-400">(Optional)</span></label>
                                                 <input
                                                     className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
                                                     value={form.advocateForRespondent}
@@ -1041,7 +1128,7 @@ const CasesPage: React.FC = () => {
                                     {form.caseType === "Criminal" && (
                                         <>
                                             <div>
-                                                <label className="block text-xs text-slate-600 mb-1">Advocate for Complainant</label>
+                                                <label className="block text-xs text-slate-600 mb-1">Advocate for Complainant <span className="text-slate-400">(Optional)</span></label>
                                                 <input
                                                     className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
                                                     value={form.advocateForPetitioner}
@@ -1050,7 +1137,7 @@ const CasesPage: React.FC = () => {
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-xs text-slate-600 mb-1">Advocate for Accused</label>
+                                                <label className="block text-xs text-slate-600 mb-1">Advocate for Accused <span className="text-slate-400">(Optional)</span></label>
                                                 <input
                                                     className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
                                                     value={form.advocateForRespondent}
@@ -1062,7 +1149,7 @@ const CasesPage: React.FC = () => {
                                     )}
                                     {form.caseType === "Criminal" && (
                                         <div>
-                                            <label className="block text-xs text-slate-600 mb-1">Public Prosecutor (PP)</label>
+                                            <label className="block text-xs text-slate-600 mb-1">Public Prosecutor (PP) <span className="text-slate-400">(Optional)</span></label>
                                             <input
                                                 className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
                                                 value={form.publicProsecutor}
@@ -1072,7 +1159,7 @@ const CasesPage: React.FC = () => {
                                         </div>
                                     )}
                                     <div>
-                                        <label className="block text-xs text-slate-600 mb-1">Senior Counsel</label>
+                                        <label className="block text-xs text-slate-600 mb-1">Senior Counsel <span className="text-slate-400">(Optional)</span></label>
                                         <input
                                             className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
                                             value={form.seniorCounsel}
@@ -1093,7 +1180,7 @@ const CasesPage: React.FC = () => {
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Current Stage</label>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">Current Stage <span className="text-slate-500 font-normal text-xs">(Optional)</span></label>
                                 <select
                                     className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
                                     value={form.currentStage}
@@ -1113,11 +1200,15 @@ const CasesPage: React.FC = () => {
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Case Status</label>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">Case Status <span className="text-slate-500 font-normal text-xs">(Optional)</span></label>
                                 <select
                                     className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                    value={form.status}
-                                    onChange={e => setForm({ ...form, status: e.target.value as any })}
+                                    value={form.status || "pending"}
+                                    onChange={e => {
+                                        const validStatuses = ["pending", "admitted", "dismissed", "allowed", "disposed", "withdrawn", "compromised", "stayed", "appeal_filed"];
+                                        const newStatus = validStatuses.includes(e.target.value) ? e.target.value : "pending";
+                                        setForm({ ...form, status: newStatus as typeof form.status });
+                                    }}
                                 >
                                     <option value="pending">Pending</option>
                                     <option value="admitted">Admitted</option>
@@ -1131,7 +1222,7 @@ const CasesPage: React.FC = () => {
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Filing Date</label>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">Filing Date <span className="text-slate-500 font-normal text-xs">(Optional)</span></label>
                                 <input
                                     type="date"
                                     className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
@@ -1140,7 +1231,7 @@ const CasesPage: React.FC = () => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Last Hearing Date</label>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">Last Hearing Date <span className="text-slate-500 font-normal text-xs">(Optional)</span></label>
                                 <input
                                     type="date"
                                     className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
@@ -1149,7 +1240,7 @@ const CasesPage: React.FC = () => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Next Hearing Date</label>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">Next Hearing Date <span className="text-slate-500 font-normal text-xs">(Optional)</span></label>
                                 <input
                                     type="date"
                                     className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
@@ -1158,7 +1249,7 @@ const CasesPage: React.FC = () => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Purpose of Hearing</label>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">Purpose of Hearing <span className="text-slate-500 font-normal text-xs">(Optional)</span></label>
                                 <select
                                     className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
                                     value={form.hearingPurpose}

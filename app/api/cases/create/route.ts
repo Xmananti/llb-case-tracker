@@ -39,14 +39,19 @@ const caseSchema = z.object({
       "stayed",
       "appeal_filed",
     ])
-    .optional(),
+    .default("pending"),
   filingDate: z.string().optional(),
   userId: z.string(),
-  organizationId: z.string(), // Required for multi-tenancy
 });
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
+
+  // Preprocess body to ensure status is valid
+  if (body.status === "" || body.status === null || body.status === undefined) {
+    body.status = "pending";
+  }
+
   const parse = caseSchema.safeParse(body);
   if (!parse.success) {
     return NextResponse.json(
@@ -82,42 +87,27 @@ export async function POST(req: NextRequest) {
     status,
     filingDate,
     userId,
-    organizationId,
   } = parse.data;
 
   try {
-    // Verify organization exists and check case limits
-    const orgRef = adminDb.ref(`organizations/${organizationId}`);
-    const orgSnapshot = await orgRef.once("value");
-    const orgData = orgSnapshot.val();
-
-    if (!orgData) {
-      return NextResponse.json(
-        { error: "Organization not found" },
-        { status: 404 }
-      );
-    }
-
-    // Check subscription status
-    if (
-      orgData.subscriptionStatus === "expired" ||
-      orgData.subscriptionStatus === "cancelled"
-    ) {
-      return NextResponse.json(
-        { error: "Organization subscription is expired or cancelled" },
-        { status: 403 }
-      );
-    }
-
-    // Check case limit
-    const maxCases = orgData.maxCases || 0;
-    const currentCases = orgData.currentCases || 0;
-
-    if (maxCases > 0 && currentCases >= maxCases) {
-      return NextResponse.json(
-        { error: "Organization has reached maximum case limit" },
-        { status: 403 }
-      );
+    // Check if Admin SDK is available
+    try {
+      // Test if adminDb is accessible
+      adminDb.ref("test");
+    } catch (adminError) {
+      const adminErrorMessage =
+        adminError instanceof Error ? adminError.message : String(adminError);
+      if (adminErrorMessage.includes("Firebase Admin SDK is not configured")) {
+        return NextResponse.json(
+          {
+            error:
+              "Server configuration error: Firebase Admin SDK is not properly configured. Please contact your administrator.",
+            details: adminErrorMessage,
+          },
+          { status: 500 }
+        );
+      }
+      throw adminError;
     }
 
     const casesRef = adminDb.ref("cases");
@@ -148,21 +138,28 @@ export async function POST(req: NextRequest) {
       hearingPurpose: hearingPurpose || "",
       notes: notes || "",
       caseType: caseType || "",
-      status: status || "pending",
+      status:
+        status &&
+        [
+          "pending",
+          "admitted",
+          "dismissed",
+          "allowed",
+          "disposed",
+          "withdrawn",
+          "compromised",
+          "stayed",
+          "appeal_filed",
+        ].includes(status)
+          ? status
+          : "pending",
       filingDate: filingDate || "",
       userId,
-      organizationId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
     await newCaseRef.set(caseData);
-
-    // Increment organization case count
-    await orgRef.update({
-      currentCases: currentCases + 1,
-      updatedAt: new Date().toISOString(),
-    });
 
     return NextResponse.json(
       {
@@ -173,8 +170,41 @@ export async function POST(req: NextRequest) {
     );
   } catch (error) {
     console.error("Error creating case:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    // Check if it's an Admin SDK initialization error
+    if (errorMessage.includes("Firebase Admin SDK is not configured")) {
+      return NextResponse.json(
+        {
+          error:
+            "Server configuration error: Firebase Admin SDK is not properly configured. Please contact your administrator.",
+          details: errorMessage,
+        },
+        { status: 500 }
+      );
+    }
+
+    // Check if it's a database connection error
+    if (
+      errorMessage.includes("PERMISSION_DENIED") ||
+      errorMessage.includes("permission")
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Permission denied: Unable to access database. Please check your permissions.",
+          details: errorMessage,
+        },
+        { status: 403 }
+      );
+    }
+
     return NextResponse.json(
-      { error: "Failed to create case" },
+      {
+        error: "Failed to create case",
+        details:
+          process.env.NODE_ENV === "development" ? errorMessage : undefined,
+      },
       { status: 500 }
     );
   }

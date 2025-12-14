@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ensureUserHasOrganization } from "../../../../lib/utils/default-organization";
 
 export async function GET(
   req: NextRequest,
@@ -51,6 +52,15 @@ export async function GET(
       try {
         const firebaseUser = await adminAuth.getUser(userId);
 
+        // Ensure user has an organization (assign default if needed)
+        let organizationId = "";
+        try {
+          organizationId = await ensureUserHasOrganization(userId);
+        } catch (orgError) {
+          console.warn("Could not assign default organization:", orgError);
+          // Continue without organization - will be assigned on next request
+        }
+
         // Create basic user record
         const basicUserData = {
           uid: firebaseUser.uid,
@@ -58,7 +68,7 @@ export async function GET(
           name: firebaseUser.displayName || "",
           firmName: "",
           logoUrl: "",
-          organizationId: "",
+          organizationId: organizationId,
           role: "lawyer",
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -83,6 +93,21 @@ export async function GET(
           organizationId: undefined,
           role: "lawyer",
         });
+      }
+    } else if (!userData.organizationId) {
+      // User exists but has no organization - assign default
+      try {
+        const organizationId = await ensureUserHasOrganization(userId);
+        userData.organizationId = organizationId;
+        // Update user record
+        const userRef = adminDb.ref(`users/${userId}`);
+        await userRef.update({
+          organizationId: organizationId,
+          updatedAt: new Date().toISOString(),
+        });
+      } catch (orgError) {
+        console.warn("Could not assign default organization:", orgError);
+        // Continue without organization - will be assigned on next request
       }
     }
 
