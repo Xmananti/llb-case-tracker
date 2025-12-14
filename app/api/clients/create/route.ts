@@ -9,7 +9,6 @@ const clientSchema = z.object({
   address: z.string().optional(),
   notes: z.string().optional(),
   userId: z.string(),
-  organizationId: z.string().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -21,8 +20,7 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
-  const { name, email, phone, address, notes, userId, organizationId } =
-    parse.data;
+  const { name, email, phone, address, notes, userId } = parse.data;
 
   try {
     const clientsRef = adminDb.ref("clients");
@@ -35,7 +33,6 @@ export async function POST(req: NextRequest) {
       address: address || "",
       notes: notes || "",
       userId,
-      organizationId: organizationId || "",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };

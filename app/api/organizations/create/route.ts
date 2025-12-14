@@ -37,9 +37,10 @@ export async function POST(req: NextRequest) {
         ? new Date(
             now.getTime() + plan.trialDays * 24 * 60 * 60 * 1000
           ).toISOString()
-        : undefined;
+        : null;
 
-    const organizationData = {
+    // Build organization data, omitting undefined values (Firebase doesn't accept undefined)
+    const organizationData: any = {
       name,
       email,
       phone: phone || "",
@@ -48,8 +49,6 @@ export async function POST(req: NextRequest) {
       subscriptionPlan,
       subscriptionStatus: plan.trialDays > 0 ? "trial" : "active",
       subscriptionStartDate: now.toISOString(),
-      subscriptionEndDate: undefined,
-      trialEndDate,
       maxUsers: plan.maxUsers,
       maxCases: plan.maxCases,
       currentUsers: 0,
@@ -58,6 +57,12 @@ export async function POST(req: NextRequest) {
       updatedAt: now.toISOString(),
       createdBy,
     };
+
+    // Only include optional date fields if they have values
+    if (trialEndDate) {
+      organizationData.trialEndDate = trialEndDate;
+    }
+    // subscriptionEndDate is not set initially (can be added later when subscription ends)
 
     const orgsRef = adminDb.ref("organizations");
     const newOrgRef = orgsRef.push();

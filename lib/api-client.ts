@@ -1,9 +1,6 @@
-export async function getCases(userId: string, organizationId?: string) {
+export async function getCases(userId: string) {
   try {
     const params = new URLSearchParams({ userId });
-    if (organizationId) {
-      params.append("organizationId", organizationId);
-    }
     const res = await fetch(`/api/cases/list?${params.toString()}`);
     if (!res.ok) {
       let errorMessage = "Failed to fetch cases";
@@ -67,7 +64,6 @@ export async function createCase({
   status,
   filingDate,
   userId,
-  organizationId,
 }: {
   title: string;
   description: string;
@@ -105,7 +101,6 @@ export async function createCase({
     | "appeal_filed";
   filingDate?: string;
   userId: string;
-  organizationId: string;
 }) {
   const res = await fetch("/api/cases/create", {
     method: "POST",
@@ -138,10 +133,27 @@ export async function createCase({
       status,
       filingDate,
       userId,
-      organizationId,
     }),
   });
-  if (!res.ok) throw new Error("Failed to create");
+  if (!res.ok) {
+    let errorMessage = "Failed to create case";
+    try {
+      const errorData = await res.json();
+      errorMessage = errorData.error || errorMessage;
+      // Include validation details if available
+      if (errorData.details) {
+        const details =
+          errorData.details.fieldErrors || errorData.details.formErrors || [];
+        if (details.length > 0) {
+          errorMessage += `: ${details.join(", ")}`;
+        }
+      }
+    } catch {
+      // If response is not JSON, use status text
+      errorMessage = res.statusText || errorMessage;
+    }
+    throw new Error(errorMessage);
+  }
   return await res.json();
 }
 
@@ -174,7 +186,6 @@ export async function updateCase({
   status,
   filingDate,
   userId,
-  organizationId,
 }: {
   id: string;
   title: string;
@@ -213,7 +224,6 @@ export async function updateCase({
     | "appeal_filed";
   filingDate?: string;
   userId: string;
-  organizationId?: string;
 }) {
   const res = await fetch("/api/cases/update", {
     method: "PATCH",
@@ -247,7 +257,6 @@ export async function updateCase({
       status,
       filingDate,
       userId,
-      organizationId,
     }),
   });
   if (!res.ok) throw new Error("Failed to update");
@@ -257,16 +266,14 @@ export async function updateCase({
 export async function deleteCase({
   id,
   userId,
-  organizationId,
 }: {
   id: string;
   userId: string;
-  organizationId?: string;
 }) {
   const res = await fetch("/api/cases/delete", {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id, userId, organizationId }),
+    body: JSON.stringify({ id, userId }),
   });
   if (!res.ok) {
     let errorMessage = "Failed to delete case";
@@ -340,12 +347,9 @@ export async function updateOrganizationSubscription(
 }
 
 // Client API functions
-export async function getClients(userId: string, organizationId?: string) {
+export async function getClients(userId: string) {
   try {
     const params = new URLSearchParams({ userId });
-    if (organizationId) {
-      params.append("organizationId", organizationId);
-    }
     const res = await fetch(`/api/clients/list?${params.toString()}`);
     if (!res.ok) {
       let errorMessage = "Failed to fetch clients";
@@ -382,7 +386,6 @@ export async function createClient({
   address,
   notes,
   userId,
-  organizationId,
 }: {
   name: string;
   email?: string;
@@ -390,7 +393,6 @@ export async function createClient({
   address?: string;
   notes?: string;
   userId: string;
-  organizationId?: string;
 }) {
   const res = await fetch("/api/clients/create", {
     method: "POST",
@@ -402,7 +404,6 @@ export async function createClient({
       address,
       notes,
       userId,
-      organizationId,
     }),
   });
   if (!res.ok) throw new Error("Failed to create client");

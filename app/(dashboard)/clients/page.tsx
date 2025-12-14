@@ -62,7 +62,7 @@ const ClientsPage: React.FC = () => {
         const fetchClients = async () => {
             setLoading(true);
             try {
-                const res = await getClients(user.uid, userData?.organizationId);
+                const res = await getClients(user.uid);
                 setClients(res);
                 setError("");
 
@@ -111,7 +111,7 @@ const ClientsPage: React.FC = () => {
         };
 
         fetchClients();
-    }, [user, userData?.organizationId, searchQuery]);
+    }, [user, searchQuery]);
 
     // Handle search
     const handleSearch = (query: string) => {
@@ -150,7 +150,6 @@ const ClientsPage: React.FC = () => {
                 await createClient({
                     ...form,
                     userId: user.uid,
-                    organizationId: userData?.organizationId,
                 });
             }
 
@@ -159,7 +158,7 @@ const ClientsPage: React.FC = () => {
             setEditId(null);
 
             // Refresh clients
-            const res = await getClients(user.uid, userData?.organizationId);
+            const res = await getClients(user.uid);
             setClients(res);
             setFilteredClients(res);
         } catch (err) {
@@ -183,7 +182,7 @@ const ClientsPage: React.FC = () => {
         setDeletingClientId(id);
         try {
             await deleteClient(id);
-            const res = await getClients(user.uid, userData?.organizationId);
+            const res = await getClients(user.uid);
             setClients(res);
             setFilteredClients(res);
             // Remove from payments state

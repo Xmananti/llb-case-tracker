@@ -41,8 +41,7 @@ const DashboardHome: React.FC = () => {
             setLoading(true);
             setError("");
             try {
-                // Always pass userId, organizationId is optional
-                const data = await getCases(user.uid, userData?.organizationId) as Array<{
+                const data = await getCases(user.uid) as Array<{
                     id: string;
                     title: string;
                     description: string;
@@ -77,12 +76,7 @@ const DashboardHome: React.FC = () => {
             } catch (err) {
                 console.error("Error fetching cases:", err);
                 const errorMessage = err instanceof Error ? err.message : "Failed to fetch cases";
-                // If user has no organization, show helpful message
-                if (!userData?.organizationId) {
-                    setError("No organization assigned. Your cases may not be visible. Please contact your administrator.");
-                } else {
-                    setError(errorMessage);
-                }
+                setError(errorMessage);
             } finally {
                 setLoading(false);
             }
@@ -170,7 +164,7 @@ const DashboardHome: React.FC = () => {
                                 <FaFolder /> <span className="hidden sm:inline">All Cases</span>
                             </Link>
                             <Link
-                                href="/cases"
+                                href="/cases?new=true"
                                 className="bg-amber-600 text-white font-semibold px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg hover:bg-amber-700 transition-all shadow-md flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm"
                             >
                                 <FaPlus /> <span className="hidden sm:inline">New Case</span>
@@ -421,7 +415,7 @@ const DashboardHome: React.FC = () => {
                             <h3 className="text-lg sm:text-xl font-semibold text-slate-900 mb-2">No cases yet</h3>
                             <p className="text-slate-600 text-sm sm:text-base mb-4">Create your first case to get started</p>
                             <Link
-                                href="/cases"
+                                href="/cases?new=true"
                                 className="inline-flex items-center gap-2 bg-amber-600 text-white font-semibold px-4 sm:px-6 py-2 sm:py-3 rounded-lg hover:bg-amber-700 transition shadow-md"
                             >
                                 <FaPlus /> Create Your First Case
