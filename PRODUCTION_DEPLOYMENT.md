@@ -40,23 +40,12 @@ If build succeeds, proceed to deployment.
    - Import your Git repository
    - Vercel will auto-detect Next.js settings
 
-3. **Configure Build Settings** ⚠️ **IMPORTANT**
-   
-   **If your repository root contains a `llb-case-tracker` subdirectory:**
+3. **Configure Build Settings**
    - Framework Preset: **Next.js**
-   - **Root Directory: `llb-case-tracker`** ⚠️ **This is critical!**
+   - Root Directory: `llb-case-tracker` (if your repo root is parent)
    - Build Command: `npm run build` (auto-detected)
    - Output Directory: `.next` (auto-detected)
    - Install Command: `npm install` (auto-detected)
-   
-   **If you're deploying from within the `llb-case-tracker` directory:**
-   - Framework Preset: **Next.js** (auto-detected)
-   - Root Directory: **Leave empty or set to `.`**
-   - Build Command: `npm run build` (auto-detected)
-   - Output Directory: `.next` (auto-detected)
-   - Install Command: `npm install` (auto-detected)
-   
-   **Note:** The `vercel.json` file in the project directory will help Vercel detect Next.js automatically.
 
 ### Option B: Deploy via Vercel CLI
 
