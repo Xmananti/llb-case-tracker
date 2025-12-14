@@ -1,18 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb } from "../../../../lib/firebase/admin";
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ userId: string }> }
 ) {
-  try {
-    const { userId } = await params;
+  // Await params once at the start
+  const { userId } = await params;
+  
+  if (!userId) {
+    return NextResponse.json({ error: "User ID required" }, { status: 400 });
+  }
 
-    if (!userId) {
-      return NextResponse.json({ error: "User ID required" }, { status: 400 });
+  try {
+
+    // Try to initialize Admin SDK - if it fails, return basic user data
+    let adminDb, adminAuth;
+    try {
+      const adminModule = await import("../../../../lib/firebase/admin");
+      adminDb = adminModule.adminDb;
+      adminAuth = adminModule.adminAuth;
+    } catch (adminError: any) {
+      // Admin SDK not initialized (missing env vars) - return basic response
+      console.warn("⚠️ Admin SDK not available, returning basic user data:", adminError?.message);
+      return NextResponse.json({
+        uid: userId,
+        email: null,
+        name: undefined,
+        organizationId: undefined,
+        role: "lawyer",
+      });
     }
 
-    // Try to get user from Firebase Auth first
+    // Try to get user from Firebase Realtime Database
     let userData: any = null;
 
     try {
@@ -26,7 +45,6 @@ export async function GET(
     // If user doesn't exist in database, try to get from Auth and create basic record
     if (!userData) {
       try {
-        const { adminAuth } = await import("../../../../lib/firebase/admin");
         const firebaseUser = await adminAuth.getUser(userId);
 
         // Create basic user record
@@ -41,19 +59,30 @@ export async function GET(
         };
 
         // Save to database
-        const userRef = adminDb.ref(`users/${userId}`);
-        await userRef.set(basicUserData);
+        try {
+          const userRef = adminDb.ref(`users/${userId}`);
+          await userRef.set(basicUserData);
+        } catch (saveError) {
+          console.error("Error saving user to database:", saveError);
+        }
 
         userData = basicUserData;
       } catch (authError) {
         console.error("Error fetching user from Auth:", authError);
-        return NextResponse.json({ error: "User not found" }, { status: 404 });
+        // Return basic user data instead of error
+        return NextResponse.json({
+          uid: userId,
+          email: null,
+          name: undefined,
+          organizationId: undefined,
+          role: "lawyer",
+        });
       }
     }
 
     // If user has organization, fetch organization data
     let organization = null;
-    if (userData.organizationId) {
+    if (userData?.organizationId) {
       try {
         const orgRef = adminDb.ref(`organizations/${userData.organizationId}`);
         const orgSnapshot = await orgRef.once("value");
@@ -69,9 +98,14 @@ export async function GET(
     });
   } catch (error) {
     console.error("Error fetching user:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch user" },
-      { status: 500 }
-    );
+    // Return basic user data instead of error to prevent app crash
+    // userId is already available from the awaited params above
+    return NextResponse.json({
+      uid: userId,
+      email: null,
+      name: undefined,
+      organizationId: undefined,
+      role: "lawyer",
+    });
   }
 }

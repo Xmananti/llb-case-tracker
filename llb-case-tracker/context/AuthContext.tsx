@@ -35,9 +35,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (res.ok) {
                 const data = await res.json();
                 setUserData(data);
+            } else {
+                // If API fails, use basic user data from Firebase Auth
+                console.warn("API returned non-OK status, using basic user data");
+                setUserData({
+                    uid,
+                    email: null,
+                    name: undefined,
+                    organizationId: undefined,
+                    role: "lawyer",
+                });
             }
         } catch (error) {
             console.error("Error fetching user data:", error);
+            // Fallback to basic user data to prevent app crash
+            setUserData({
+                uid,
+                email: null,
+                name: undefined,
+                organizationId: undefined,
+                role: "lawyer",
+            });
         }
     };
 
@@ -61,7 +79,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const login = async (email: string, password: string) => {
-        await signInWithEmailAndPassword(auth, email, password);
+        try {
+            await signInWithEmailAndPassword(auth, email, password);
+        } catch (error: any) {
+            // Provide helpful error messages for network issues
+            if (error?.code === "auth/network-request-failed") {
+                throw new Error(
+                    "Network error: Unable to connect to Firebase. Please check:\n" +
+                    "1. Your internet connection\n" +
+                    "2. Firebase API key restrictions in Firebase Console\n" +
+                    "3. Browser console for CORS errors"
+                );
+            }
+            throw error;
+        }
     };
     const logout = async (onSuccess?: () => void) => {
         try {

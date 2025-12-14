@@ -7,17 +7,22 @@ import { getFirestore, Firestore } from "firebase/firestore";
 import { getDatabase, Database } from "firebase/database";
 
 // Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+// Uses environment variables with fallback to hardcoded values for development
 const firebaseConfig = {
-  apiKey: "AIzaSyAX17XUOiLQSCszTg6DnHpnWSnelYYkQes",
-  authDomain: "llb-case-tracker.firebaseapp.com",
-  databaseURL: "https://llb-case-tracker-default-rtdb.firebaseio.com",
-  projectId: "llb-case-tracker",
-  storageBucket: "llb-case-tracker.firebasestorage.app",
-  messagingSenderId: "539879699050",
-  appId: "1:539879699050:web:c5dbc51ec4841fe77c9013",
-  measurementId: "G-NX3EN6M8EL",
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyAX17XUOiLQSCszTg6DnHpnWSnelYYkQes",
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "llb-case-tracker.firebaseapp.com",
+  databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL || "https://llb-case-tracker-default-rtdb.firebaseio.com",
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "llb-case-tracker",
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "llb-case-tracker.firebasestorage.app",
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "539879699050",
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:539879699050:web:c5dbc51ec4841fe77c9013",
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || "G-NX3EN6M8EL",
 };
+
+// Validate required configuration
+if (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes("your-") || firebaseConfig.apiKey.includes("REPLACE")) {
+  console.error("❌ Firebase API key is missing or invalid. Please set NEXT_PUBLIC_FIREBASE_API_KEY in .env.local");
+}
 
 // Initialize Firebase App
 export const app: FirebaseApp = getApps().length

@@ -59,6 +59,7 @@ const CasesPage: React.FC = () => {
     const [caseStats, setCaseStats] = useState<{ [caseId: string]: { documents: number; hearings: number; tasks: number; conversations: number } }>({});
     const [deletingCaseId, setDeletingCaseId] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string>("");
+    const [isSearchExpanded, setIsSearchExpanded] = useState(false);
 
     // Fetch cases for current user
     useEffect(() => {
@@ -152,6 +153,8 @@ const CasesPage: React.FC = () => {
     useEffect(() => {
         if (searchParams?.get("search")) {
             setLocalSearchQuery(searchParams.get("search") || "");
+            // Auto-expand search on desktop if there's a search query
+            setIsSearchExpanded(true);
         } else {
             setLocalSearchQuery("");
         }
@@ -179,6 +182,8 @@ const CasesPage: React.FC = () => {
         if (localSearchQuery.trim()) {
             params.set("search", localSearchQuery.trim());
             window.history.pushState({}, "", `/cases?${params.toString()}`);
+            // Keep search expanded on desktop when there's a query
+            setIsSearchExpanded(true);
         } else {
             window.history.pushState({}, "", "/cases");
         }
@@ -413,13 +418,68 @@ const CasesPage: React.FC = () => {
     return (
         <div className="p-2 sm:p-4 max-w-7xl mx-auto">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-                <div>
+                <div className="flex items-center gap-3 flex-1">
                     <h1 className="text-xl sm:text-2xl font-bold text-slate-900">My Cases</h1>
-                    <p className="text-slate-600 text-xs sm:text-sm mt-0.5">Manage your legal cases and documents</p>
+                    {/* Desktop: Search Icon Button */}
+                    <div className="hidden md:flex items-center gap-2">
+                        {!isSearchExpanded ? (
+                            <button
+                                type="button"
+                                onClick={() => setIsSearchExpanded(true)}
+                                className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-all"
+                                title="Search cases"
+                            >
+                                <FaSearch className="text-lg" />
+                            </button>
+                        ) : (
+                            <form onSubmit={handleSearch} className="flex items-center gap-2">
+                                <div className="relative">
+                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <FaSearch className="text-slate-400 text-sm" />
+                                    </div>
+                                    <input
+                                        type="text"
+                                        value={localSearchQuery}
+                                        onChange={(e) => setLocalSearchQuery(e.target.value)}
+                                        placeholder="Search cases..."
+                                        autoFocus
+                                        className="w-64 pl-9 pr-8 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                                    />
+                                    {localSearchQuery && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setLocalSearchQuery("");
+                                                window.history.pushState({}, "", "/cases");
+                                            }}
+                                            className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+                                        >
+                                            <span className="text-lg">×</span>
+                                        </button>
+                                    )}
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsSearchExpanded(false);
+                                        if (!localSearchQuery) {
+                                            setLocalSearchQuery("");
+                                            window.history.pushState({}, "", "/cases");
+                                        }
+                                    }}
+                                    className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-all"
+                                    title="Close search"
+                                >
+                                    <FaTimes className="text-sm" />
+                                </button>
+                            </form>
+                        )}
+                    </div>
+                    <p className="text-slate-600 text-xs sm:text-sm mt-0.5 hidden sm:block">Manage your legal cases and documents</p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                    {/* Search Bar */}
-                    <form onSubmit={handleSearch} className="flex-1 sm:flex-initial sm:min-w-[250px]">
+                    {/* Mobile: Search Bar */}
+                    <form onSubmit={handleSearch} className="flex-1 md:hidden">
                         <div className="relative">
                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                 <FaSearch className="text-slate-400 text-sm" />

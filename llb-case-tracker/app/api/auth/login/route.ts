@@ -32,12 +32,17 @@ export async function POST(request: NextRequest) {
   try {
     const userCred = await signInWithEmailAndPassword(auth, email, password);
 
-    // Update last login time in Realtime Database
-    const userRef = adminDb.ref(`users/${userCred.user.uid}`);
-    await userRef.update({
-      lastLoginAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
+    // Update last login time in Realtime Database (if Admin SDK is available)
+    try {
+      const userRef = adminDb.ref(`users/${userCred.user.uid}`);
+      await userRef.update({
+        lastLoginAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (adminError) {
+      // Admin SDK not available - log but don't fail login
+      console.warn("⚠️ Could not update last login time (Admin SDK not configured):", adminError);
+    }
 
     return NextResponse.json({ user: userCred.user }, { status: 200 });
   } catch (error: unknown) {

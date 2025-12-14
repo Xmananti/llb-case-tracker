@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   // Allow public access to auth pages and API routes
   if (
     request.nextUrl.pathname.startsWith("/login") ||

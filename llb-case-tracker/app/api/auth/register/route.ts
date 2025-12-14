@@ -50,43 +50,50 @@ export async function POST(request: NextRequest) {
         password
       );
 
-      // Store user data in Realtime Database
-      const userData = {
-        uid: userCred.user.uid,
-        email: userCred.user.email,
-        name: name || "",
-        organizationId: organizationId || "",
-        role: role || "lawyer",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
+      // Store user data in Realtime Database (if Admin SDK is available)
+      try {
+        const userData = {
+          uid: userCred.user.uid,
+          email: userCred.user.email,
+          name: name || "",
+          organizationId: organizationId || "",
+          role: role || "lawyer",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
 
-      const userRef = adminDb.ref(`users/${userCred.user.uid}`);
-      await userRef.set(userData);
+        const userRef = adminDb.ref(`users/${userCred.user.uid}`);
+        await userRef.set(userData);
 
-      // If organizationId provided, increment user count
-      if (organizationId) {
-        const orgRef = adminDb.ref(`organizations/${organizationId}`);
-        const orgSnapshot = await orgRef.once("value");
-        const orgData = orgSnapshot.val();
+        // If organizationId provided, increment user count
+        if (organizationId) {
+          const orgRef = adminDb.ref(`organizations/${organizationId}`);
+          const orgSnapshot = await orgRef.once("value");
+          const orgData = orgSnapshot.val();
 
-        if (orgData) {
-          const currentUsers = orgData.currentUsers || 0;
-          const maxUsers = orgData.maxUsers || 1;
+          if (orgData) {
+            const currentUsers = orgData.currentUsers || 0;
+            const maxUsers = orgData.maxUsers || 1;
 
-          // Check if organization has reached user limit
-          if (maxUsers > 0 && currentUsers >= maxUsers) {
-            return NextResponse.json(
-              { error: "Organization has reached maximum user limit" },
-              { status: 400 }
-            );
+            // Check if organization has reached user limit
+            if (maxUsers > 0 && currentUsers >= maxUsers) {
+              return NextResponse.json(
+                { error: "Organization has reached maximum user limit" },
+                { status: 400 }
+              );
+            }
+
+            await orgRef.update({
+              currentUsers: currentUsers + 1,
+              updatedAt: new Date().toISOString(),
+            });
           }
-
-          await orgRef.update({
-            currentUsers: currentUsers + 1,
-            updatedAt: new Date().toISOString(),
-          });
         }
+      } catch (adminError) {
+        // Admin SDK not available - log but don't fail registration
+        console.warn("⚠️ Could not save user data to database (Admin SDK not configured):", adminError);
+        console.warn("   User was created in Firebase Auth, but database features will be limited.");
+        console.warn("   See ADMIN_SDK_ENV_SETUP.md to enable full functionality.");
       }
 
       return NextResponse.json({ user: userCred.user }, { status: 201 });
