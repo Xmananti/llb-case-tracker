@@ -174,13 +174,15 @@ const ClientsPage: React.FC = () => {
             return;
         }
 
+        // Check authentication before attempting deletion
+        if (!user) {
+            setError("You must be logged in to delete clients.");
+            return;
+        }
+
         setDeletingClientId(id);
         try {
             await deleteClient(id);
-            if (!user) {
-                setError("You must be logged in to delete clients.");
-                return;
-            }
             const res = await getClients(user.uid, userData?.organizationId);
             setClients(res);
             setFilteredClients(res);

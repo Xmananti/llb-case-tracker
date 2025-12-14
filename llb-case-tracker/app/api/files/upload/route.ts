@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       url: blob.url,
       path: blob.pathname,
-      size: blob.size,
+      size: file.size,
     });
   } catch (error) {
     console.error("Error uploading file:", error);

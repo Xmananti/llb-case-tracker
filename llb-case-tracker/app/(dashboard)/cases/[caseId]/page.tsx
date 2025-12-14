@@ -182,14 +182,14 @@ const CaseDetailsPage: React.FC = () => {
                                     )}
                                     {caseData.status && (
                                         <div className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1 ${caseData.status === "admitted" || caseData.status === "allowed" ? "bg-green-100 text-green-800" :
-                                                caseData.status === "dismissed" ? "bg-red-100 text-red-800" :
-                                                    caseData.status === "disposed" ? "bg-gray-100 text-gray-800" :
-                                                        caseData.status === "withdrawn" ? "bg-orange-100 text-orange-800" :
-                                                            caseData.status === "compromised" ? "bg-blue-100 text-blue-800" :
-                                                                caseData.status === "stayed" ? "bg-yellow-100 text-yellow-800" :
-                                                                    caseData.status === "appeal_filed" ? "bg-purple-100 text-purple-800" :
-                                                                        caseData.status === "pending" ? "bg-yellow-100 text-yellow-800" :
-                                                                            "bg-slate-100 text-slate-800"
+                                            caseData.status === "dismissed" ? "bg-red-100 text-red-800" :
+                                                caseData.status === "disposed" ? "bg-gray-100 text-gray-800" :
+                                                    caseData.status === "withdrawn" ? "bg-orange-100 text-orange-800" :
+                                                        caseData.status === "compromised" ? "bg-blue-100 text-blue-800" :
+                                                            caseData.status === "stayed" ? "bg-yellow-100 text-yellow-800" :
+                                                                caseData.status === "appeal_filed" ? "bg-purple-100 text-purple-800" :
+                                                                    caseData.status === "pending" ? "bg-yellow-100 text-yellow-800" :
+                                                                        "bg-slate-100 text-slate-800"
                                             }`}>
                                             {caseData.status === "admitted" || caseData.status === "allowed" ? <FaCheckCircle /> :
                                                 caseData.status === "dismissed" ? <FaTimes /> :
