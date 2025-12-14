@@ -45,3 +45,7 @@ ENV_VARIABLES_SETUP.md
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+scripts/reset-firebase-auth.js
+scripts/reset-firebase-data.js
+RESET_FIREBASE_DATA.md
