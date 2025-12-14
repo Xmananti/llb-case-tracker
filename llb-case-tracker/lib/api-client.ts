@@ -43,24 +43,67 @@ export async function createCase({
   title,
   description,
   caseNumber,
+  caseCategory,
   court,
-  oppositeParty,
+  courtComplex,
+  benchJudgeName,
+  plaintiff,
+  defendant,
+  petitioner,
+  respondent,
+  complainant,
+  accused,
+  advocateForPetitioner,
+  advocateForRespondent,
+  publicProsecutor,
+  seniorCounsel,
+  vakalatFiled,
+  currentStage,
+  lastHearingDate,
+  nextHearingDate,
+  hearingPurpose,
+  notes,
   caseType,
   status,
   filingDate,
-  nextHearingDate,
   userId,
   organizationId,
 }: {
   title: string;
   description: string;
   caseNumber?: string;
+  caseCategory?: string;
   court?: string;
-  oppositeParty?: string;
-  caseType?: string;
-  status?: "active" | "closed" | "pending" | "on_hold";
-  filingDate?: string;
+  courtComplex?: string;
+  benchJudgeName?: string;
+  plaintiff?: string;
+  defendant?: string;
+  petitioner?: string;
+  respondent?: string;
+  complainant?: string;
+  accused?: string;
+  advocateForPetitioner?: string;
+  advocateForRespondent?: string;
+  publicProsecutor?: string;
+  seniorCounsel?: string;
+  vakalatFiled?: boolean;
+  currentStage?: string;
+  lastHearingDate?: string;
   nextHearingDate?: string;
+  hearingPurpose?: string;
+  notes?: string;
+  caseType?: string;
+  status?:
+    | "pending"
+    | "admitted"
+    | "dismissed"
+    | "allowed"
+    | "disposed"
+    | "withdrawn"
+    | "compromised"
+    | "stayed"
+    | "appeal_filed";
+  filingDate?: string;
   userId: string;
   organizationId: string;
 }) {
@@ -71,12 +114,29 @@ export async function createCase({
       title,
       description,
       caseNumber,
+      caseCategory,
       court,
-      oppositeParty,
+      courtComplex,
+      benchJudgeName,
+      plaintiff,
+      defendant,
+      petitioner,
+      respondent,
+      complainant,
+      accused,
+      advocateForPetitioner,
+      advocateForRespondent,
+      publicProsecutor,
+      seniorCounsel,
+      vakalatFiled,
+      currentStage,
+      lastHearingDate,
+      nextHearingDate,
+      hearingPurpose,
+      notes,
       caseType,
       status,
       filingDate,
-      nextHearingDate,
       userId,
       organizationId,
     }),
@@ -90,12 +150,29 @@ export async function updateCase({
   title,
   description,
   caseNumber,
+  caseCategory,
   court,
-  oppositeParty,
+  courtComplex,
+  benchJudgeName,
+  plaintiff,
+  defendant,
+  petitioner,
+  respondent,
+  complainant,
+  accused,
+  advocateForPetitioner,
+  advocateForRespondent,
+  publicProsecutor,
+  seniorCounsel,
+  vakalatFiled,
+  currentStage,
+  lastHearingDate,
+  nextHearingDate,
+  hearingPurpose,
+  notes,
   caseType,
   status,
   filingDate,
-  nextHearingDate,
   userId,
   organizationId,
 }: {
@@ -103,12 +180,38 @@ export async function updateCase({
   title: string;
   description: string;
   caseNumber?: string;
+  caseCategory?: string;
   court?: string;
-  oppositeParty?: string;
-  caseType?: string;
-  status?: "active" | "closed" | "pending" | "on_hold";
-  filingDate?: string;
+  courtComplex?: string;
+  benchJudgeName?: string;
+  plaintiff?: string;
+  defendant?: string;
+  petitioner?: string;
+  respondent?: string;
+  complainant?: string;
+  accused?: string;
+  advocateForPetitioner?: string;
+  advocateForRespondent?: string;
+  publicProsecutor?: string;
+  seniorCounsel?: string;
+  vakalatFiled?: boolean;
+  currentStage?: string;
+  lastHearingDate?: string;
   nextHearingDate?: string;
+  hearingPurpose?: string;
+  notes?: string;
+  caseType?: string;
+  status?:
+    | "pending"
+    | "admitted"
+    | "dismissed"
+    | "allowed"
+    | "disposed"
+    | "withdrawn"
+    | "compromised"
+    | "stayed"
+    | "appeal_filed";
+  filingDate?: string;
   userId: string;
   organizationId?: string;
 }) {
@@ -120,12 +223,29 @@ export async function updateCase({
       title,
       description,
       caseNumber,
+      caseCategory,
       court,
-      oppositeParty,
+      courtComplex,
+      benchJudgeName,
+      plaintiff,
+      defendant,
+      petitioner,
+      respondent,
+      complainant,
+      accused,
+      advocateForPetitioner,
+      advocateForRespondent,
+      publicProsecutor,
+      seniorCounsel,
+      vakalatFiled,
+      currentStage,
+      lastHearingDate,
+      nextHearingDate,
+      hearingPurpose,
+      notes,
       caseType,
       status,
       filingDate,
-      nextHearingDate,
       userId,
       organizationId,
     }),
@@ -216,5 +336,215 @@ export async function updateOrganizationSubscription(
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error("Failed to update subscription");
+  return await res.json();
+}
+
+// Client API functions
+export async function getClients(userId: string, organizationId?: string) {
+  try {
+    const params = new URLSearchParams({ userId });
+    if (organizationId) {
+      params.append("organizationId", organizationId);
+    }
+    const res = await fetch(`/api/clients/list?${params.toString()}`);
+    if (!res.ok) {
+      let errorMessage = "Failed to fetch clients";
+      try {
+        const errorData = await res.json();
+        errorMessage = errorData.error || errorMessage;
+      } catch {
+        errorMessage = res.statusText || errorMessage;
+      }
+      throw new Error(errorMessage);
+    }
+    return await res.json();
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error("Failed to fetch clients");
+  }
+}
+
+export async function getClient(clientId: string) {
+  const res = await fetch(`/api/clients/${clientId}`);
+  if (!res.ok) {
+    if (res.status === 404) throw new Error("Client not found");
+    throw new Error("Failed to fetch client");
+  }
+  return await res.json();
+}
+
+export async function createClient({
+  name,
+  email,
+  phone,
+  address,
+  notes,
+  userId,
+  organizationId,
+}: {
+  name: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  notes?: string;
+  userId: string;
+  organizationId?: string;
+}) {
+  const res = await fetch("/api/clients/create", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name,
+      email,
+      phone,
+      address,
+      notes,
+      userId,
+      organizationId,
+    }),
+  });
+  if (!res.ok) throw new Error("Failed to create client");
+  return await res.json();
+}
+
+export async function updateClient({
+  id,
+  name,
+  email,
+  phone,
+  address,
+  notes,
+}: {
+  id: string;
+  name?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  notes?: string;
+}) {
+  const res = await fetch(`/api/clients/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name,
+      email,
+      phone,
+      address,
+      notes,
+    }),
+  });
+  if (!res.ok) throw new Error("Failed to update client");
+  return await res.json();
+}
+
+export async function deleteClient(id: string) {
+  const res = await fetch(`/api/clients/${id}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    let errorMessage = "Failed to delete client";
+    try {
+      const errorData = await res.json();
+      errorMessage = errorData.error || errorMessage;
+    } catch {
+      if (res.status === 404) {
+        errorMessage = "Client not found";
+      } else {
+        errorMessage = res.statusText || errorMessage;
+      }
+    }
+    throw new Error(errorMessage);
+  }
+  return await res.json();
+}
+
+// Payment API functions
+export async function getClientPayments(clientId: string) {
+  const res = await fetch(`/api/clients/${clientId}/payments`);
+  if (!res.ok) {
+    if (res.status === 404) throw new Error("Client not found");
+    throw new Error("Failed to fetch payments");
+  }
+  return await res.json();
+}
+
+export async function createPayment({
+  amount,
+  date,
+  method,
+  description,
+  clientId,
+  userId,
+}: {
+  amount: number;
+  date: string;
+  method?: string;
+  description?: string;
+  clientId: string;
+  userId: string;
+}) {
+  const res = await fetch(`/api/clients/${clientId}/payments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      amount,
+      date,
+      method,
+      description,
+      clientId,
+      userId,
+    }),
+  });
+  if (!res.ok) throw new Error("Failed to create payment");
+  return await res.json();
+}
+
+export async function updatePayment({
+  id,
+  amount,
+  date,
+  method,
+  description,
+}: {
+  id: string;
+  amount?: number;
+  date?: string;
+  method?: string;
+  description?: string;
+}) {
+  const res = await fetch(`/api/clients/payments/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      amount,
+      date,
+      method,
+      description,
+    }),
+  });
+  if (!res.ok) throw new Error("Failed to update payment");
+  return await res.json();
+}
+
+export async function deletePayment(id: string) {
+  const res = await fetch(`/api/clients/payments/${id}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    let errorMessage = "Failed to delete payment";
+    try {
+      const errorData = await res.json();
+      errorMessage = errorData.error || errorMessage;
+    } catch {
+      if (res.status === 404) {
+        errorMessage = "Payment not found";
+      } else {
+        errorMessage = res.statusText || errorMessage;
+      }
+    }
+    throw new Error(errorMessage);
+  }
   return await res.json();
 }

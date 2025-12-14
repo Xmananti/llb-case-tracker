@@ -160,7 +160,7 @@ const DashboardHome: React.FC = () => {
                     <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
                         <div className="flex items-center gap-2 sm:gap-3">
                             <FaGavel className="text-amber-600 text-xl sm:text-2xl" />
-                            <h1 className="text-lg sm:text-xl font-bold text-slate-900">LLB Case Tracker</h1>
+                            <h1 className="text-lg sm:text-xl font-bold text-slate-900">Dashboard</h1>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
                             <Link

@@ -1,16 +1,16 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "../../../../context/AuthContext";
 import { getCase } from "../../../../lib/api-client";
-import { app, storage } from "../../../../lib/firebase/config";
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
+import { app } from "../../../../lib/firebase/config";
+import { uploadCaseDocument, deleteFile } from "../../../../lib/firebase/storage";
 import { getFirestore, collection, query, where, addDoc, getDocs, deleteDoc, doc as fsDoc, Timestamp, updateDoc, orderBy, onSnapshot } from "firebase/firestore";
 import type { Timestamp as TTimestamp } from "firebase/firestore";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { FaFileAlt, FaCalendarAlt, FaUser, FaBuilding, FaHashtag, FaTag, FaCheckCircle, FaClock, FaPauseCircle, FaUpload, FaTrash, FaDownload, FaEdit, FaFilePdf, FaComments, FaPaperPlane, FaEye } from "react-icons/fa";
+import { FaFileAlt, FaCalendarAlt, FaUser, FaBuilding, FaHashtag, FaTag, FaCheckCircle, FaClock, FaPauseCircle, FaUpload, FaTrash, FaDownload, FaEdit, FaFilePdf, FaComments, FaPaperPlane, FaEye, FaArrowLeft } from "react-icons/fa";
 
 interface DocumentResource {
     id: string;
@@ -30,12 +30,29 @@ interface CaseDoc {
     description: string;
     userId: string;
     caseNumber?: string;
+    caseCategory?: string;
     court?: string;
-    oppositeParty?: string;
-    caseType?: string;
-    status?: "active" | "closed" | "pending" | "on_hold";
-    filingDate?: string;
+    courtComplex?: string;
+    benchJudgeName?: string;
+    plaintiff?: string;
+    defendant?: string;
+    petitioner?: string;
+    respondent?: string;
+    complainant?: string;
+    accused?: string;
+    advocateForPetitioner?: string;
+    advocateForRespondent?: string;
+    publicProsecutor?: string;
+    seniorCounsel?: string;
+    vakalatFiled?: boolean;
+    currentStage?: string;
+    lastHearingDate?: string;
     nextHearingDate?: string;
+    hearingPurpose?: string;
+    notes?: string;
+    caseType?: string;
+    status?: "pending" | "admitted" | "dismissed" | "allowed" | "disposed" | "withdrawn" | "compromised" | "stayed" | "appeal_filed";
+    filingDate?: string;
 }
 
 interface Hearing {
@@ -68,10 +85,11 @@ const taskSchema = z.object({
 });
 type TaskForm = z.infer<typeof taskSchema>;
 
-const tabs = ["Documents", "Hearings", "Tasks", "Conversations"];
+const tabs = ["Documents", "Orders/Judgments", "Hearings", "Tasks", "Conversations"];
 
 const CaseDetailsPage: React.FC = () => {
     const { caseId } = useParams<{ caseId: string }>();
+    const router = useRouter();
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState(0);
     const [caseData, setCaseData] = useState<CaseDoc | null>(null);
@@ -94,12 +112,29 @@ const CaseDetailsPage: React.FC = () => {
                     description: data.description,
                     userId: data.userId,
                     caseNumber: data.caseNumber || "",
+                    caseCategory: data.caseCategory || "",
                     court: data.court || "",
-                    oppositeParty: data.oppositeParty || "",
-                    caseType: data.caseType || "",
-                    status: data.status || "active",
-                    filingDate: data.filingDate || "",
+                    courtComplex: data.courtComplex || "",
+                    benchJudgeName: data.benchJudgeName || "",
+                    plaintiff: data.plaintiff || "",
+                    defendant: data.defendant || "",
+                    petitioner: data.petitioner || "",
+                    respondent: data.respondent || "",
+                    complainant: data.complainant || "",
+                    accused: data.accused || "",
+                    advocateForPetitioner: data.advocateForPetitioner || "",
+                    advocateForRespondent: data.advocateForRespondent || "",
+                    publicProsecutor: data.publicProsecutor || "",
+                    seniorCounsel: data.seniorCounsel || "",
+                    vakalatFiled: data.vakalatFiled || false,
+                    currentStage: data.currentStage || "",
+                    lastHearingDate: data.lastHearingDate || "",
                     nextHearingDate: data.nextHearingDate || "",
+                    hearingPurpose: data.hearingPurpose || "",
+                    notes: data.notes || "",
+                    caseType: data.caseType || "",
+                    status: data.status || "pending",
+                    filingDate: data.filingDate || "",
                 });
             } catch (err) {
                 console.error("Error fetching case:", err);
@@ -125,6 +160,16 @@ const CaseDetailsPage: React.FC = () => {
                 </div>
             ) : (
                 <>
+                    {/* Back Button */}
+                    <div className="mb-3">
+                        <button
+                            onClick={() => router.back()}
+                            className="flex items-center gap-2 text-slate-600 hover:text-slate-900 transition-colors font-medium text-sm"
+                        >
+                            <FaArrowLeft className="text-sm" />
+                            <span>Back to Cases</span>
+                        </button>
+                    </div>
                     <div className="mb-4 bg-white rounded-lg shadow-md p-4 border-l-4 border-amber-500">
                         <div className="flex justify-between items-start mb-3">
                             <div className="flex-1">
@@ -136,16 +181,26 @@ const CaseDetailsPage: React.FC = () => {
                                         </div>
                                     )}
                                     {caseData.status && (
-                                        <div className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1 ${caseData.status === "active" ? "bg-green-100 text-green-800" :
-                                            caseData.status === "closed" ? "bg-gray-100 text-gray-800" :
-                                                caseData.status === "pending" ? "bg-yellow-100 text-yellow-800" :
-                                                    "bg-orange-100 text-orange-800"
+                                        <div className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1 ${caseData.status === "admitted" || caseData.status === "allowed" ? "bg-green-100 text-green-800" :
+                                                caseData.status === "dismissed" ? "bg-red-100 text-red-800" :
+                                                    caseData.status === "disposed" ? "bg-gray-100 text-gray-800" :
+                                                        caseData.status === "withdrawn" ? "bg-orange-100 text-orange-800" :
+                                                            caseData.status === "compromised" ? "bg-blue-100 text-blue-800" :
+                                                                caseData.status === "stayed" ? "bg-yellow-100 text-yellow-800" :
+                                                                    caseData.status === "appeal_filed" ? "bg-purple-100 text-purple-800" :
+                                                                        caseData.status === "pending" ? "bg-yellow-100 text-yellow-800" :
+                                                                            "bg-slate-100 text-slate-800"
                                             }`}>
-                                            {caseData.status === "active" ? <FaCheckCircle /> :
-                                                caseData.status === "closed" ? <FaCheckCircle /> :
-                                                    caseData.status === "pending" ? <FaClock /> :
-                                                        <FaPauseCircle />}
-                                            <span className="capitalize">{caseData.status}</span>
+                                            {caseData.status === "admitted" || caseData.status === "allowed" ? <FaCheckCircle /> :
+                                                caseData.status === "dismissed" ? <FaTimes /> :
+                                                    caseData.status === "disposed" ? <FaCheckCircle /> :
+                                                        caseData.status === "withdrawn" ? <FaClock /> :
+                                                            caseData.status === "compromised" ? <FaCheckCircle /> :
+                                                                caseData.status === "stayed" ? <FaPauseCircle /> :
+                                                                    caseData.status === "appeal_filed" ? <FaFileAlt /> :
+                                                                        caseData.status === "pending" ? <FaClock /> :
+                                                                            <FaClock />}
+                                            <span className="capitalize">{caseData.status.replace("_", " ")}</span>
                                         </div>
                                     )}
                                 </div>
@@ -157,10 +212,28 @@ const CaseDetailsPage: React.FC = () => {
                                             <span className="font-semibold">Court:</span> {caseData.court}
                                         </div>
                                     )}
-                                    {caseData.oppositeParty && (
+                                    {caseData.plaintiff && (
                                         <div className="flex items-center gap-2 text-slate-700">
                                             <FaUser className="text-amber-600" />
-                                            <span className="font-semibold">Opposite Party:</span> {caseData.oppositeParty}
+                                            <span className="font-semibold">Plaintiff:</span> {caseData.plaintiff}
+                                        </div>
+                                    )}
+                                    {caseData.defendant && (
+                                        <div className="flex items-center gap-2 text-slate-700">
+                                            <FaUser className="text-amber-600" />
+                                            <span className="font-semibold">Defendant:</span> {caseData.defendant}
+                                        </div>
+                                    )}
+                                    {caseData.advocates && (
+                                        <div className="flex items-center gap-2 text-slate-700">
+                                            <FaUser className="text-amber-600" />
+                                            <span className="font-semibold">Advocate(s):</span> {caseData.advocates}
+                                        </div>
+                                    )}
+                                    {caseData.currentStage && (
+                                        <div className="flex items-center gap-2 text-slate-700">
+                                            <FaFileAlt className="text-amber-600" />
+                                            <span className="font-semibold">Current Stage:</span> {caseData.currentStage}
                                         </div>
                                     )}
                                     {caseData.caseType && (
@@ -182,6 +255,14 @@ const CaseDetailsPage: React.FC = () => {
                                         </div>
                                     )}
                                 </div>
+                                {caseData.notes && (
+                                    <div className="mt-3 pt-3 border-t border-slate-200">
+                                        <div className="text-sm">
+                                            <span className="font-semibold text-slate-700">Notes / Remarks:</span>
+                                            <p className="text-slate-600 mt-1 whitespace-pre-wrap">{caseData.notes}</p>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -203,9 +284,10 @@ const CaseDetailsPage: React.FC = () => {
                     </div>
                     <div>
                         {activeTab === 0 && <CaseDocumentsTab caseId={caseId as string} />}
-                        {activeTab === 1 && <CaseHearingsTab caseId={caseId as string} />}
-                        {activeTab === 2 && <CaseTasksTab caseId={caseId as string} />}
-                        {activeTab === 3 && <CaseConversationsTab caseId={caseId as string} />}
+                        {activeTab === 1 && <CaseOrdersJudgmentsTab caseId={caseId as string} />}
+                        {activeTab === 2 && <CaseHearingsTab caseId={caseId as string} />}
+                        {activeTab === 3 && <CaseTasksTab caseId={caseId as string} />}
+                        {activeTab === 4 && <CaseConversationsTab caseId={caseId as string} />}
                     </div>
                 </>
             )}
@@ -288,22 +370,9 @@ const CaseDocumentsTab: React.FC<{ caseId: string }> = ({ caseId }) => {
         setUploading(true);
         setError("");
         try {
-            // Fix linter - only call Date.now inside handler
-            const timestamp = new Date().getTime();
-            const storageRef = ref(storage, `cases/${caseId}/documents/${timestamp}_${file.name}`);
-            const uploadTask = uploadBytesResumable(storageRef, file);
+            // Upload to Vercel Blob Storage
+            const { url, path } = await uploadCaseDocument(caseId, file);
 
-            // Wait for upload to complete
-            await new Promise((resolve, reject) => {
-                uploadTask.on(
-                    "state_changed",
-                    null,
-                    (error) => reject(error),
-                    () => resolve(undefined)
-                );
-            });
-
-            const url = await getDownloadURL(storageRef);
             const fileType = file.type || "";
             const isImage = fileType.startsWith("image/");
             const isPDF = fileType === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
@@ -314,7 +383,7 @@ const CaseDocumentsTab: React.FC<{ caseId: string }> = ({ caseId }) => {
                 url,
                 uploadedBy: user?.uid,
                 uploadedAt: Timestamp.now(),
-                path: storageRef.fullPath,
+                path: path,
                 type: fileType || "unknown",
                 size: file.size,
                 isImage,
@@ -343,7 +412,7 @@ const CaseDocumentsTab: React.FC<{ caseId: string }> = ({ caseId }) => {
     };
 
     // Handle delete
-    const handleDelete = async (docId: string, filePath: string) => {
+    const handleDelete = async (docId: string, fileUrl: string) => {
         if (!user) {
             setError("You must be logged in to delete documents.");
             return;
@@ -355,9 +424,9 @@ const CaseDocumentsTab: React.FC<{ caseId: string }> = ({ caseId }) => {
 
         try {
             setError("");
-            // Delete from storage first
+            // Delete from Vercel Blob Storage first
             try {
-                await deleteObject(ref(storage, filePath));
+                await deleteFile(fileUrl);
             } catch (storageError) {
                 console.warn("Error deleting from storage:", storageError);
                 // Continue to delete metadata even if storage delete fails
@@ -461,7 +530,7 @@ const CaseDocumentsTab: React.FC<{ caseId: string }> = ({ caseId }) => {
                                                 className="bg-red-600 text-white rounded px-2 py-1.5 hover:bg-red-700 transition font-medium text-xs flex items-center justify-center"
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    handleDelete(d.id, d.path);
+                                                    handleDelete(d.id, d.url);
                                                 }}
                                                 title="Delete"
                                             >
@@ -510,6 +579,251 @@ const CaseDocumentsTab: React.FC<{ caseId: string }> = ({ caseId }) => {
                         </div>
                     )}
                 </>
+            )}
+        </div>
+    );
+};
+
+const CaseOrdersJudgmentsTab: React.FC<{ caseId: string }> = ({ caseId }) => {
+    const { user } = useAuth();
+    const db = getFirestore(app);
+
+    if (!user) {
+        return (
+            <div className="bg-white rounded-lg shadow-md p-4">
+                <div className="text-center py-6 text-slate-500 text-sm">
+                    Please log in to view orders/judgments.
+                </div>
+            </div>
+        );
+    }
+
+    const [docs, setDocs] = useState<(DocumentResource & { isImage?: boolean; isPDF?: boolean; category?: string })[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [uploading, setUploading] = useState(false);
+    const [error, setError] = useState("");
+    const [previewDoc, setPreviewDoc] = useState<{ url: string; name: string; type: string } | null>(null);
+
+    useEffect(() => {
+        if (!user || !caseId) return;
+        const fetchDocs = async () => {
+            setLoading(true);
+            const q = query(collection(db, "documents"), where("caseId", "==", caseId));
+            try {
+                const snap = await getDocs(q);
+                const allDocs = snap.docs.map(doc => {
+                    const data = doc.data();
+                    return {
+                        id: doc.id,
+                        caseId: data.caseId,
+                        name: data.name,
+                        url: data.url,
+                        uploadedBy: data.uploadedBy,
+                        uploadedAt: data.uploadedAt,
+                        path: data.path,
+                        type: data.type,
+                        size: data.size,
+                        isImage: data.isImage,
+                        isPDF: data.isPDF,
+                        category: data.category,
+                    } as DocumentResource & { isImage?: boolean; isPDF?: boolean; category?: string };
+                });
+                // Filter for orders/judgments
+                const ordersJudgments = allDocs.filter(doc =>
+                    doc.category === "order" ||
+                    doc.category === "judgment" ||
+                    doc.name.toLowerCase().includes("order") ||
+                    doc.name.toLowerCase().includes("judgment")
+                );
+                setDocs(ordersJudgments);
+                setError("");
+            } catch (err: unknown) {
+                console.error("Error loading orders/judgments:", err);
+                setError("Could not load orders/judgments");
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchDocs();
+    }, [user, caseId, db]);
+
+    const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        const input = e.currentTarget.elements.namedItem("docfile") as HTMLInputElement;
+        const categoryInput = e.currentTarget.elements.namedItem("category") as HTMLSelectElement;
+        if (!input?.files?.[0]) return;
+        const file = input.files[0];
+        setUploading(true);
+        setError("");
+        try {
+            const { url, path } = await uploadCaseDocument(caseId, file);
+            const fileType = file.type || "";
+            const isImage = fileType.startsWith("image/");
+            const isPDF = fileType === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+
+            await addDoc(collection(db, "documents"), {
+                caseId,
+                name: file.name,
+                url,
+                uploadedBy: user?.uid,
+                uploadedAt: Timestamp.now(),
+                path: path,
+                type: fileType || "unknown",
+                size: file.size,
+                isImage,
+                isPDF,
+                category: categoryInput?.value || "order",
+            });
+
+            const snap = await getDocs(query(collection(db, "documents"), where("caseId", "==", caseId)));
+            const allDocs = snap.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    caseId: data.caseId,
+                    name: data.name,
+                    url: data.url,
+                    uploadedBy: data.uploadedBy,
+                    uploadedAt: data.uploadedAt,
+                    path: data.path,
+                    category: data.category,
+                } as DocumentResource & { category?: string };
+            });
+            const ordersJudgments = allDocs.filter(doc =>
+                doc.category === "order" ||
+                doc.category === "judgment" ||
+                doc.name.toLowerCase().includes("order") ||
+                doc.name.toLowerCase().includes("judgment")
+            );
+            setDocs(ordersJudgments);
+        } catch (err: unknown) {
+            let message = "Upload failed";
+            if (err instanceof Error) message = err.message;
+            setError(message);
+        }
+        setUploading(false);
+        if (input) input.value = "";
+    };
+
+    const handleDelete = async (docId: string, fileUrl: string) => {
+        if (!confirm("Are you sure you want to delete this document?")) return;
+        try {
+            await deleteFile(fileUrl);
+            await deleteDoc(fsDoc(db, "documents", docId));
+            setDocs(docs.filter(d => d.id !== docId));
+        } catch (err: unknown) {
+            let message = "Delete failed";
+            if (err instanceof Error) message = err.message;
+            setError(message);
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="bg-white rounded-lg shadow-md p-4">
+                <div className="text-center py-6 text-slate-500 text-sm">Loading orders/judgments...</div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="bg-white rounded-lg shadow-md p-4">
+            <div className="mb-4">
+                <h3 className="text-lg font-bold text-slate-900 mb-3">Orders & Judgments</h3>
+                <form onSubmit={handleUpload} className="flex flex-col sm:flex-row gap-3">
+                    <input
+                        type="file"
+                        name="docfile"
+                        className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                        required
+                    />
+                    <select
+                        name="category"
+                        className="border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                        defaultValue="order"
+                    >
+                        <option value="order">Order</option>
+                        <option value="judgment">Judgment</option>
+                    </select>
+                    <button
+                        type="submit"
+                        disabled={uploading}
+                        className="bg-slate-900 text-white px-4 py-2 rounded-lg hover:bg-slate-800 transition font-semibold text-sm disabled:opacity-50"
+                    >
+                        {uploading ? "Uploading..." : "Upload"}
+                    </button>
+                </form>
+            </div>
+
+            {error && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">
+                    {error}
+                </div>
+            )}
+
+            {docs.length === 0 ? (
+                <div className="text-center py-8 text-slate-500 text-sm">
+                    No orders or judgments uploaded yet.
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {docs.map((d) => (
+                        <div key={d.id} className="border border-slate-200 rounded-lg p-4 hover:shadow-md transition">
+                            <div className="flex items-start justify-between mb-2">
+                                <div className="flex-1 min-w-0">
+                                    <h4 className="font-semibold text-slate-900 truncate text-sm">{d.name}</h4>
+                                    {d.category && (
+                                        <span className={`inline-block mt-1 px-2 py-0.5 rounded text-xs font-semibold ${d.category === "judgment" ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800"
+                                            }`}>
+                                            {d.category === "judgment" ? "Judgment" : "Order"}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="flex gap-2 mt-3">
+                                <a
+                                    href={d.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex-1 bg-amber-600 text-white rounded px-3 py-2 hover:bg-amber-700 transition font-medium text-xs text-center"
+                                >
+                                    <FaEye className="inline mr-1" /> View
+                                </a>
+                                <a
+                                    href={d.url}
+                                    download
+                                    className="bg-slate-600 text-white rounded px-3 py-2 hover:bg-slate-700 transition font-medium text-xs flex items-center justify-center"
+                                >
+                                    <FaDownload className="text-xs" />
+                                </a>
+                                <button
+                                    className="bg-red-600 text-white rounded px-3 py-2 hover:bg-red-700 transition font-medium text-xs flex items-center justify-center"
+                                    onClick={() => handleDelete(d.id, d.url)}
+                                >
+                                    <FaTrash className="text-xs" />
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {previewDoc && (
+                <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4" onClick={() => setPreviewDoc(null)}>
+                    <div className="bg-white rounded-lg max-w-4xl w-full max-h-[95vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+                        <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center">
+                            <h3 className="font-semibold text-slate-900">{previewDoc.name}</h3>
+                            <button onClick={() => setPreviewDoc(null)} className="text-slate-600 hover:text-slate-900 text-2xl">×</button>
+                        </div>
+                        <div className="p-6">
+                            {previewDoc.type === "pdf" ? (
+                                <iframe src={previewDoc.url} className="w-full h-[600px] border-0" title={previewDoc.name} />
+                            ) : (
+                                <img src={previewDoc.url} alt={previewDoc.name} className="max-w-full h-auto mx-auto" />
+                            )}
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

@@ -19,7 +19,7 @@ Based on verification, your Firebase integration is **structurally complete**. Y
 4. Scroll to **"Your apps"** section
 5. If no web app exists:
    - Click **"Add app"** > **Web** (</> icon)
-   - Register app name (e.g., "LLB Case Tracker Web")
+   - Register app name (e.g., "AdvocatePro Web")
    - Click **"Register app"**
 6. Copy the config values shown:
    ```javascript

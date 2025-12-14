@@ -7,12 +7,41 @@ const schema = z.object({
   title: z.string().min(2),
   description: z.string().min(2),
   caseNumber: z.string().optional(),
+  caseCategory: z.string().optional(),
   court: z.string().optional(),
-  oppositeParty: z.string().optional(),
-  caseType: z.string().optional(),
-  status: z.enum(["active", "closed", "pending", "on_hold"]).optional(),
-  filingDate: z.string().optional(),
+  courtComplex: z.string().optional(),
+  benchJudgeName: z.string().optional(),
+  plaintiff: z.string().optional(),
+  defendant: z.string().optional(),
+  petitioner: z.string().optional(),
+  respondent: z.string().optional(),
+  complainant: z.string().optional(),
+  accused: z.string().optional(),
+  advocateForPetitioner: z.string().optional(),
+  advocateForRespondent: z.string().optional(),
+  publicProsecutor: z.string().optional(),
+  seniorCounsel: z.string().optional(),
+  vakalatFiled: z.boolean().optional(),
+  currentStage: z.string().optional(),
+  lastHearingDate: z.string().optional(),
   nextHearingDate: z.string().optional(),
+  hearingPurpose: z.string().optional(),
+  notes: z.string().optional(),
+  caseType: z.string().optional(),
+  status: z
+    .enum([
+      "pending",
+      "admitted",
+      "dismissed",
+      "allowed",
+      "disposed",
+      "withdrawn",
+      "compromised",
+      "stayed",
+      "appeal_filed",
+    ])
+    .optional(),
+  filingDate: z.string().optional(),
   userId: z.string(),
   organizationId: z.string().optional(), // Optional for updates, but should match existing
 });
@@ -31,12 +60,29 @@ export async function PATCH(req: NextRequest) {
     title,
     description,
     caseNumber,
+    caseCategory,
     court,
-    oppositeParty,
+    courtComplex,
+    benchJudgeName,
+    plaintiff,
+    defendant,
+    petitioner,
+    respondent,
+    complainant,
+    accused,
+    advocateForPetitioner,
+    advocateForRespondent,
+    publicProsecutor,
+    seniorCounsel,
+    vakalatFiled,
+    currentStage,
+    lastHearingDate,
+    nextHearingDate,
+    hearingPurpose,
+    notes,
     caseType,
     status,
     filingDate,
-    nextHearingDate,
     userId,
   } = parse.data;
 
@@ -56,12 +102,69 @@ export async function PATCH(req: NextRequest) {
       title,
       description,
       caseNumber: caseNumber || "",
+      caseCategory:
+        caseCategory !== undefined
+          ? caseCategory || ""
+          : existingCase.caseCategory || "",
       court: court || "",
-      oppositeParty: oppositeParty || "",
-      caseType: caseType || "",
-      status: status || "active",
-      filingDate: filingDate || "",
+      courtComplex:
+        courtComplex !== undefined
+          ? courtComplex || ""
+          : existingCase.courtComplex || "",
+      benchJudgeName:
+        benchJudgeName !== undefined
+          ? benchJudgeName || ""
+          : existingCase.benchJudgeName || "",
+      plaintiff: plaintiff || "",
+      defendant: defendant || "",
+      petitioner:
+        petitioner !== undefined
+          ? petitioner || ""
+          : existingCase.petitioner || "",
+      respondent:
+        respondent !== undefined
+          ? respondent || ""
+          : existingCase.respondent || "",
+      complainant:
+        complainant !== undefined
+          ? complainant || ""
+          : existingCase.complainant || "",
+      accused:
+        accused !== undefined ? accused || "" : existingCase.accused || "",
+      advocateForPetitioner:
+        advocateForPetitioner !== undefined
+          ? advocateForPetitioner || ""
+          : existingCase.advocateForPetitioner || "",
+      advocateForRespondent:
+        advocateForRespondent !== undefined
+          ? advocateForRespondent || ""
+          : existingCase.advocateForRespondent || "",
+      publicProsecutor:
+        publicProsecutor !== undefined
+          ? publicProsecutor || ""
+          : existingCase.publicProsecutor || "",
+      seniorCounsel:
+        seniorCounsel !== undefined
+          ? seniorCounsel || ""
+          : existingCase.seniorCounsel || "",
+      vakalatFiled:
+        vakalatFiled !== undefined
+          ? vakalatFiled
+          : existingCase.vakalatFiled || false,
+      currentStage: currentStage || "",
+      lastHearingDate:
+        lastHearingDate !== undefined
+          ? lastHearingDate || ""
+          : existingCase.lastHearingDate || "",
       nextHearingDate: nextHearingDate || "",
+      hearingPurpose:
+        hearingPurpose !== undefined
+          ? hearingPurpose || ""
+          : existingCase.hearingPurpose || "",
+      notes: notes || "",
+      caseType: caseType || "",
+      status: status || "pending",
+      filingDate: filingDate || "",
       updatedAt: new Date().toISOString(),
       // Preserve original fields
       userId: existingCase.userId,

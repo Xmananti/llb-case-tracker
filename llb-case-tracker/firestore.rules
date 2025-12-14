@@ -1,0 +1,46 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if user owns the resource
+    function isOwner(resource) {
+      return request.auth != null &&
+             (resource.data.uploadedBy == request.auth.uid ||
+              resource.data.userId == request.auth.uid ||
+              resource.data.senderId == request.auth.uid);
+    }
+
+    // Documents collection - allow authenticated users to read/write
+    match /documents/{docId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && isOwner(resource);
+    }
+
+    // Hearings collection - allow authenticated users to read/write
+    match /hearings/{hearingId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && isOwner(resource);
+    }
+
+    // Tasks collection - allow authenticated users to read/write
+    match /tasks/{taskId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && isOwner(resource);
+    }
+
+    // Conversations collection - allow authenticated users to read/write
+    match /conversations/{messageId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && isOwner(resource);
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}

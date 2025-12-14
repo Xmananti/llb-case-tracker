@@ -26,7 +26,7 @@ These are **different** and serve different purposes!
 1. Click **"Add app"** button
 2. Select **Web** (</> icon)
 3. Register app:
-   - **App nickname**: "LLB Case Tracker Web" (or any name)
+   - **App nickname**: "AdvocatePro Web" (or any name)
    - **Firebase Hosting**: (optional, can skip)
 4. Click **"Register app"**
 

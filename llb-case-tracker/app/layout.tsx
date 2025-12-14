@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "LLB Case Tracker - Legal Case Management System",
+  title: "AdvocatePro - Legal Case Management System",
   description: "Professional legal case tracking and management system for law firms",
 };
 

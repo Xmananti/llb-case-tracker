@@ -1,6 +1,6 @@
 # 🚀 Production Deployment Guide
 
-This guide will help you deploy the LLB Case Tracker application to production.
+This guide will help you deploy the AdvocatePro application to production.
 
 ## Prerequisites
 

@@ -49,7 +49,7 @@ const RegisterPage: React.FC = () => {
             <div className="w-full max-w-md rounded-lg bg-white p-4 sm:p-6 lg:p-8 shadow-xl border-t-4 border-amber-500">
                 <div className="text-center mb-4 sm:mb-6">
                     <FaGavel className="text-3xl sm:text-4xl text-amber-600 mx-auto mb-2" />
-                    <h2 className="text-xl sm:text-2xl font-bold text-slate-900">Register for LLB Case Tracker</h2>
+                    <h2 className="text-xl sm:text-2xl font-bold text-slate-900">Create Account</h2>
                     <p className="text-xs sm:text-sm text-slate-600 mt-2">Create your account to get started</p>
                 </div>
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 sm:space-y-4">

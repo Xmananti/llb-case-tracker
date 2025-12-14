@@ -1,41 +1,46 @@
+/**
+ * Storage module - Now uses Vercel Blob Storage instead of Firebase Storage
+ * This provides free file storage without Firebase Storage costs
+ */
+
 import {
-  getStorage,
-  ref,
-  uploadBytesResumable,
-  getDownloadURL,
-  deleteObject,
-  UploadTask,
-} from "firebase/storage";
-import { app } from "./config";
+  uploadFile as blobUploadFile,
+  deleteFile as blobDeleteFile,
+  getFileUrl as blobGetFileUrl,
+  uploadCaseDocument as blobUploadCaseDocument,
+  uploadUserLogo as blobUploadUserLogo,
+  UploadProgress,
+} from "../storage/blob";
 
-const storage = getStorage(app);
-
+// Re-export for backward compatibility
 export const uploadFile = async (
   path: string,
-  file: File
-): Promise<UploadTask> => {
-  const storageRef = ref(storage, path);
-  return uploadBytesResumable(storageRef, file);
+  file: File,
+  onProgress?: (progress: UploadProgress) => void
+) => {
+  return blobUploadFile(path, file, onProgress);
 };
 
-export const getFileUrl = async (path: string): Promise<string> => {
-  const storageRef = ref(storage, path);
-  return await getDownloadURL(storageRef);
+export const getFileUrl = async (url: string): Promise<string> => {
+  return blobGetFileUrl(url);
 };
 
-export const deleteFile = async (path: string): Promise<void> => {
-  const storageRef = ref(storage, path);
-  await deleteObject(storageRef);
+export const deleteFile = async (url: string): Promise<void> => {
+  return blobDeleteFile(url);
 };
 
 export const uploadCaseDocument = async (
   caseId: string,
-  file: File
+  file: File,
+  onProgress?: (progress: UploadProgress) => void
 ): Promise<{ url: string; path: string }> => {
-  const timestamp = Date.now();
-  const path = `cases/${caseId}/documents/${timestamp}_${file.name}`;
-  const uploadTask = await uploadFile(path, file);
-  await uploadTask;
-  const url = await getFileUrl(path);
-  return { url, path };
+  return blobUploadCaseDocument(caseId, file, onProgress);
+};
+
+export const uploadUserLogo = async (
+  userId: string,
+  file: File,
+  onProgress?: (progress: UploadProgress) => void
+): Promise<{ url: string; path: string }> => {
+  return blobUploadUserLogo(userId, file, onProgress);
 };

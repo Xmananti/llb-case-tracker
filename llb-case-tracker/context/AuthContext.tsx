@@ -7,6 +7,8 @@ interface UserData {
     uid: string;
     email: string | null;
     name?: string;
+    firmName?: string;
+    logoUrl?: string;
     organizationId?: string;
     role?: "owner" | "admin" | "lawyer" | "assistant" | "viewer";
     organization?: any;
@@ -42,6 +44,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     uid,
                     email: null,
                     name: undefined,
+                    firmName: undefined,
+                    logoUrl: undefined,
                     organizationId: undefined,
                     role: "lawyer",
                 });

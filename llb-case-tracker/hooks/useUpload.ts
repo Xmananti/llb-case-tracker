@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { uploadCaseDocument } from "../lib/firebase/storage";
+import type { UploadProgress } from "../lib/storage/blob";
 
 export const useUpload = () => {
   const [uploading, setUploading] = useState(false);
@@ -11,7 +12,14 @@ export const useUpload = () => {
     setProgress(0);
     setError(null);
     try {
-      const result = await uploadCaseDocument(caseId, file);
+      const result = await uploadCaseDocument(
+        caseId,
+        file,
+        (progress: UploadProgress) => {
+          const percent = (progress.loaded / progress.total) * 100;
+          setProgress(percent);
+        }
+      );
       setProgress(100);
       return result;
     } catch (err) {
