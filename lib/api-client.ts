@@ -39,6 +39,9 @@ export async function getCase(caseId: string, userId?: string) {
 export async function createCase({
   title,
   description,
+  plaintiffCase,
+  defendantCase,
+  workToBeDone,
   caseNumber,
   caseCategory,
   court,
@@ -59,6 +62,7 @@ export async function createCase({
   lastHearingDate,
   nextHearingDate,
   hearingPurpose,
+  purposeOfHearingStage,
   notes,
   caseType,
   status,
@@ -67,6 +71,9 @@ export async function createCase({
 }: {
   title: string;
   description: string;
+  plaintiffCase?: string;
+  defendantCase?: string;
+  workToBeDone?: string;
   caseNumber?: string;
   caseCategory?: string;
   court?: string;
@@ -87,6 +94,7 @@ export async function createCase({
   lastHearingDate?: string;
   nextHearingDate?: string;
   hearingPurpose?: string;
+  purposeOfHearingStage?: string;
   notes?: string;
   caseType?: string;
   status?:
@@ -108,6 +116,9 @@ export async function createCase({
     body: JSON.stringify({
       title,
       description,
+      plaintiffCase,
+      defendantCase,
+      workToBeDone,
       caseNumber,
       caseCategory,
       court,
@@ -128,6 +139,7 @@ export async function createCase({
       lastHearingDate,
       nextHearingDate,
       hearingPurpose,
+      purposeOfHearingStage,
       notes,
       caseType,
       status,
@@ -161,6 +173,9 @@ export async function updateCase({
   id,
   title,
   description,
+  plaintiffCase,
+  defendantCase,
+  workToBeDone,
   caseNumber,
   caseCategory,
   court,
@@ -181,6 +196,7 @@ export async function updateCase({
   lastHearingDate,
   nextHearingDate,
   hearingPurpose,
+  purposeOfHearingStage,
   notes,
   caseType,
   status,
@@ -190,6 +206,9 @@ export async function updateCase({
   id: string;
   title: string;
   description: string;
+  plaintiffCase?: string;
+  defendantCase?: string;
+  workToBeDone?: string;
   caseNumber?: string;
   caseCategory?: string;
   court?: string;
@@ -210,6 +229,7 @@ export async function updateCase({
   lastHearingDate?: string;
   nextHearingDate?: string;
   hearingPurpose?: string;
+  purposeOfHearingStage?: string;
   notes?: string;
   caseType?: string;
   status?:
@@ -232,6 +252,9 @@ export async function updateCase({
       id,
       title,
       description,
+      plaintiffCase,
+      defendantCase,
+      workToBeDone,
       caseNumber,
       caseCategory,
       court,
@@ -252,6 +275,7 @@ export async function updateCase({
       lastHearingDate,
       nextHearingDate,
       hearingPurpose,
+      purposeOfHearingStage,
       notes,
       caseType,
       status,

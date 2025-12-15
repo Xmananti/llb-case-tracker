@@ -6,6 +6,9 @@ const schema = z.object({
   id: z.string(),
   title: z.string().min(2),
   description: z.string().min(2),
+  plaintiffCase: z.string().optional(),
+  defendantCase: z.string().optional(),
+  workToBeDone: z.string().optional(),
   caseNumber: z.string().optional(),
   caseCategory: z.string().optional(),
   court: z.string().optional(),
@@ -26,6 +29,7 @@ const schema = z.object({
   lastHearingDate: z.string().optional(),
   nextHearingDate: z.string().optional(),
   hearingPurpose: z.string().optional(),
+  purposeOfHearingStage: z.string().optional(),
   notes: z.string().optional(),
   caseType: z.string().optional(),
   status: z
@@ -58,6 +62,9 @@ export async function PATCH(req: NextRequest) {
     id,
     title,
     description,
+    plaintiffCase,
+    defendantCase,
+    workToBeDone,
     caseNumber,
     caseCategory,
     court,
@@ -78,6 +85,7 @@ export async function PATCH(req: NextRequest) {
     lastHearingDate,
     nextHearingDate,
     hearingPurpose,
+    purposeOfHearingStage,
     notes,
     caseType,
     status,
@@ -100,6 +108,18 @@ export async function PATCH(req: NextRequest) {
     const updateData: any = {
       title,
       description,
+      plaintiffCase:
+        plaintiffCase !== undefined
+          ? plaintiffCase || ""
+          : existingCase.plaintiffCase || "",
+      defendantCase:
+        defendantCase !== undefined
+          ? defendantCase || ""
+          : existingCase.defendantCase || "",
+      workToBeDone:
+        workToBeDone !== undefined
+          ? workToBeDone || ""
+          : existingCase.workToBeDone || "",
       caseNumber: caseNumber || "",
       caseCategory:
         caseCategory !== undefined
@@ -160,6 +180,10 @@ export async function PATCH(req: NextRequest) {
         hearingPurpose !== undefined
           ? hearingPurpose || ""
           : existingCase.hearingPurpose || "",
+      purposeOfHearingStage:
+        purposeOfHearingStage !== undefined
+          ? purposeOfHearingStage || ""
+          : existingCase.purposeOfHearingStage || "",
       notes: notes || "",
       caseType: caseType || "",
       status: status || "pending",

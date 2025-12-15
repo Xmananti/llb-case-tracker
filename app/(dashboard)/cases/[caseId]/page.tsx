@@ -29,11 +29,12 @@ interface CaseDoc {
     title: string;
     description: string;
     userId: string;
+    plaintiffCase?: string;
+    defendantCase?: string;
+    workToBeDone?: string;
     caseNumber?: string;
     caseCategory?: string;
     court?: string;
-    courtComplex?: string;
-    benchJudgeName?: string;
     plaintiff?: string;
     defendant?: string;
     petitioner?: string;
@@ -43,12 +44,11 @@ interface CaseDoc {
     advocateForPetitioner?: string;
     advocateForRespondent?: string;
     publicProsecutor?: string;
-    seniorCounsel?: string;
-    vakalatFiled?: boolean;
     currentStage?: string;
     lastHearingDate?: string;
     nextHearingDate?: string;
     hearingPurpose?: string;
+    purposeOfHearingStage?: string;
     notes?: string;
     caseType?: string;
     status?: "pending" | "admitted" | "dismissed" | "allowed" | "disposed" | "withdrawn" | "compromised" | "stayed" | "appeal_filed";
@@ -85,7 +85,7 @@ const taskSchema = z.object({
 });
 type TaskForm = z.infer<typeof taskSchema>;
 
-const tabs = ["Documents", "Orders/Judgments", "Hearings", "Tasks", "Conversations"];
+const tabs = ["Documents", "Citations", "Orders/Judgments", "Hearings", "Tasks", "Conversations"];
 
 const CaseDetailsPage: React.FC = () => {
     const { caseId } = useParams<{ caseId: string }>();
@@ -111,11 +111,12 @@ const CaseDetailsPage: React.FC = () => {
                     title: data.title,
                     description: data.description,
                     userId: data.userId,
+                    plaintiffCase: data.plaintiffCase || "",
+                    defendantCase: data.defendantCase || "",
+                    workToBeDone: data.workToBeDone || "",
                     caseNumber: data.caseNumber || "",
                     caseCategory: data.caseCategory || "",
                     court: data.court || "",
-                    courtComplex: data.courtComplex || "",
-                    benchJudgeName: data.benchJudgeName || "",
                     plaintiff: data.plaintiff || "",
                     defendant: data.defendant || "",
                     petitioner: data.petitioner || "",
@@ -125,12 +126,11 @@ const CaseDetailsPage: React.FC = () => {
                     advocateForPetitioner: data.advocateForPetitioner || "",
                     advocateForRespondent: data.advocateForRespondent || "",
                     publicProsecutor: data.publicProsecutor || "",
-                    seniorCounsel: data.seniorCounsel || "",
-                    vakalatFiled: data.vakalatFiled || false,
                     currentStage: data.currentStage || "",
                     lastHearingDate: data.lastHearingDate || "",
                     nextHearingDate: data.nextHearingDate || "",
                     hearingPurpose: data.hearingPurpose || "",
+                    purposeOfHearingStage: data.purposeOfHearingStage || "",
                     notes: data.notes || "",
                     caseType: data.caseType || "",
                     status: data.status || "pending",
@@ -161,13 +161,19 @@ const CaseDetailsPage: React.FC = () => {
             ) : (
                 <>
                     {/* Back Button */}
-                    <div className="mb-3">
+                    <div className="mb-3 flex items-center justify-between gap-2">
                         <button
                             onClick={() => router.back()}
                             className="flex items-center gap-2 text-slate-600 hover:text-slate-900 transition-colors font-medium text-sm"
                         >
                             <FaArrowLeft className="text-sm" />
                             <span>Back to Cases</span>
+                        </button>
+                        <button
+                            onClick={() => router.push(`/cases?edit=${caseId}`)}
+                            className="px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs sm:text-sm font-semibold hover:bg-slate-800 transition-colors"
+                        >
+                            Edit Case
                         </button>
                     </div>
                     <div className="mb-4 bg-white rounded-lg shadow-md p-4 border-l-4 border-amber-500">
@@ -204,8 +210,36 @@ const CaseDetailsPage: React.FC = () => {
                                         </div>
                                     )}
                                 </div>
-                                <p className="text-slate-600 text-sm mb-3">{caseData.description}</p>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-3 border-t border-slate-200 text-sm">
+                                <div className="mt-3 pt-3 border-t border-slate-200">
+                                    <h2 className="text-sm font-semibold text-slate-800 mb-2">Description</h2>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                                        {(caseData.plaintiffCase || caseData.description) && (
+                                            <div>
+                                                <h3 className="font-semibold text-slate-700 mb-1">Plaintiff Case</h3>
+                                                <p className="text-slate-600 whitespace-pre-wrap">
+                                                    {caseData.plaintiffCase || caseData.description}
+                                                </p>
+                                            </div>
+                                        )}
+                                        {caseData.defendantCase && (
+                                            <div>
+                                                <h3 className="font-semibold text-slate-700 mb-1">Defendant/Opponent Case</h3>
+                                                <p className="text-slate-600 whitespace-pre-wrap">
+                                                    {caseData.defendantCase}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                    {caseData.workToBeDone && (
+                                        <div className="mt-3">
+                                            <h3 className="font-semibold text-slate-700 mb-1">Work to be Done</h3>
+                                            <p className="text-slate-600 text-sm whitespace-pre-wrap">
+                                                {caseData.workToBeDone}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-3 border-t border-slate-200 text-sm mt-3">
                                     {caseData.court && (
                                         <div className="flex items-center gap-2 text-slate-700">
                                             <FaBuilding className="text-amber-600" />
@@ -242,10 +276,17 @@ const CaseDetailsPage: React.FC = () => {
                                             <span className="font-semibold">Filing Date:</span> {new Date(caseData.filingDate).toLocaleDateString()}
                                         </div>
                                     )}
-                                    {caseData.nextHearingDate && (
-                                        <div className="flex items-center gap-2 text-amber-700 font-semibold">
-                                            <FaCalendarAlt />
-                                            <span>Next Hearing:</span> {new Date(caseData.nextHearingDate).toLocaleDateString()}
+                                    {caseData.purposeOfHearingStage && (
+                                        <div className="flex items-start gap-2 text-amber-700">
+                                            <FaCalendarAlt className="mt-0.5" />
+                                            <div className="flex flex-col">
+                                                <span className="font-semibold text-xs sm:text-sm">
+                                                    Purpose of Hearing - Stage (Date)
+                                                </span>
+                                                <span className="text-xs sm:text-sm text-amber-800 whitespace-pre-wrap">
+                                                    {caseData.purposeOfHearingStage}
+                                                </span>
+                                            </div>
                                         </div>
                                     )}
                                 </div>
@@ -278,10 +319,11 @@ const CaseDetailsPage: React.FC = () => {
                     </div>
                     <div>
                         {activeTab === 0 && <CaseDocumentsTab caseId={caseId as string} />}
-                        {activeTab === 1 && <CaseOrdersJudgmentsTab caseId={caseId as string} />}
-                        {activeTab === 2 && <CaseHearingsTab caseId={caseId as string} />}
-                        {activeTab === 3 && <CaseTasksTab caseId={caseId as string} />}
-                        {activeTab === 4 && <CaseConversationsTab caseId={caseId as string} />}
+                        {activeTab === 1 && <CaseCitationsTab caseId={caseId as string} />}
+                        {activeTab === 2 && <CaseOrdersJudgmentsTab caseId={caseId as string} />}
+                        {activeTab === 3 && <CaseHearingsTab caseId={caseId as string} />}
+                        {activeTab === 4 && <CaseTasksTab caseId={caseId as string} />}
+                        {activeTab === 5 && <CaseConversationsTab caseId={caseId as string} />}
                     </div>
                 </>
             )}
@@ -538,6 +580,298 @@ const CaseDocumentsTab: React.FC<{ caseId: string }> = ({ caseId }) => {
                     </div>
 
                     {/* Preview Modal */}
+                    {previewDoc && (
+                        <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-2 sm:p-4" onClick={() => setPreviewDoc(null)}>
+                            <div className="bg-white rounded-lg max-w-4xl w-full max-h-[95vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+                                <div className="sticky top-0 bg-white border-b border-slate-200 px-3 sm:px-6 py-3 sm:py-4 flex justify-between items-center">
+                                    <h3 className="font-semibold text-slate-900 text-sm sm:text-base truncate flex-1 mr-2">{previewDoc.name}</h3>
+                                    <button
+                                        onClick={() => setPreviewDoc(null)}
+                                        className="text-slate-600 hover:text-slate-900 text-xl sm:text-2xl shrink-0"
+                                    >
+                                        ×
+                                    </button>
+                                </div>
+                                <div className="p-3 sm:p-6">
+                                    {previewDoc.type === "image" ? (
+                                        <img src={previewDoc.url} alt={previewDoc.name} className="max-w-full h-auto mx-auto" />
+                                    ) : previewDoc.type === "pdf" ? (
+                                        <iframe src={previewDoc.url} className="w-full h-[400px] sm:h-[500px] lg:h-[600px] border-0" title={previewDoc.name} />
+                                    ) : (
+                                        <div className="text-center py-12">
+                                            <FaFileAlt className="text-6xl text-slate-400 mx-auto mb-4" />
+                                            <p className="text-slate-600 mb-4">Preview not available for this file type</p>
+                                            <a
+                                                href={previewDoc.url}
+                                                download
+                                                className="inline-block bg-slate-900 text-white px-6 py-3 rounded-lg hover:bg-slate-800 transition font-semibold"
+                                            >
+                                                <FaDownload className="inline mr-2" /> Download File
+                                            </a>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </>
+            )}
+        </div>
+    );
+};
+
+const CaseCitationsTab: React.FC<{ caseId: string }> = ({ caseId }) => {
+    const { user } = useAuth();
+    const db = getFirestore(app);
+
+    if (!user) {
+        return (
+            <div className="bg-white rounded-lg shadow-md p-4">
+                <div className="text-center py-6 text-slate-500 text-sm">
+                    Please log in to view citations.
+                </div>
+            </div>
+        );
+    }
+
+    const [docs, setDocs] = useState<(DocumentResource & { isImage?: boolean; isPDF?: boolean })[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [uploading, setUploading] = useState(false);
+    const [error, setError] = useState("");
+    const [previewDoc, setPreviewDoc] = useState<{ url: string; name: string; type: string } | null>(null);
+
+    useEffect(() => {
+        if (!user || !caseId) return;
+        const fetchDocs = async () => {
+            setLoading(true);
+            const q = query(collection(db, "documents"), where("caseId", "==", caseId));
+            try {
+                const snap = await getDocs(q);
+                const allDocs = snap.docs.map(doc => {
+                    const data = doc.data();
+                    return {
+                        id: doc.id,
+                        caseId: data.caseId,
+                        name: data.name,
+                        url: data.url,
+                        uploadedBy: data.uploadedBy,
+                        uploadedAt: data.uploadedAt,
+                        path: data.path,
+                        type: data.type,
+                        size: data.size,
+                        isImage: data.isImage,
+                        isPDF: data.isPDF,
+                        category: data.category,
+                    } as DocumentResource & { isImage?: boolean; isPDF?: boolean; category?: string };
+                });
+                // Filter only citation documents
+                const citationDocs = allDocs.filter(doc =>
+                    doc.category === "citation" ||
+                    doc.name.toLowerCase().includes("citation")
+                );
+                setDocs(citationDocs);
+                setError("");
+            } catch (err: unknown) {
+                console.error("Error loading citations:", err);
+                let message = "Could not load citations";
+                if (err instanceof Error) {
+                    if (err.message.includes("permission") || err.message.includes("Missing") || err.message.includes("insufficient")) {
+                        message = "Permission denied. Please configure Firebase security rules. See FIREBASE_SECURITY_RULES.md";
+                    } else {
+                        message = err.message;
+                    }
+                }
+                setError(message);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchDocs();
+    }, [user, caseId, db]);
+
+    const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        const input = e.currentTarget.elements.namedItem("citationfile") as HTMLInputElement;
+        if (!input?.files?.[0]) return;
+        const file = input.files[0];
+        setUploading(true);
+        setError("");
+        try {
+            const { url, path } = await uploadCaseDocument(caseId, file);
+
+            const fileType = file.type || "";
+            const isImage = fileType.startsWith("image/");
+            const isPDF = fileType === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+
+            await addDoc(collection(db, "documents"), {
+                caseId,
+                name: file.name,
+                url,
+                uploadedBy: user?.uid,
+                uploadedAt: Timestamp.now(),
+                path: path,
+                type: fileType || "unknown",
+                size: file.size,
+                isImage,
+                isPDF,
+                category: "citation",
+            });
+            const snap = await getDocs(query(collection(db, "documents"), where("caseId", "==", caseId)));
+            const allDocs = snap.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    caseId: data.caseId,
+                    name: data.name,
+                    url: data.url,
+                    uploadedBy: data.uploadedBy,
+                    uploadedAt: data.uploadedAt,
+                    path: data.path,
+                    category: data.category,
+                } as DocumentResource & { category?: string };
+            });
+            const citationDocs = allDocs.filter(doc =>
+                doc.category === "citation" ||
+                doc.name.toLowerCase().includes("citation")
+            );
+            setDocs(citationDocs);
+        } catch (err: unknown) {
+            let message = "Upload failed";
+            if (err instanceof Error) message = err.message;
+            setError(message);
+        }
+        setUploading(false);
+        if (input) input.value = "";
+    };
+
+    const handleDelete = async (docId: string, fileUrl: string) => {
+        if (!user) {
+            setError("You must be logged in to delete citations.");
+            return;
+        }
+
+        if (!confirm("Are you sure you want to delete this citation?")) {
+            return;
+        }
+
+        try {
+            setError("");
+            try {
+                await deleteFile(fileUrl);
+            } catch (storageError) {
+                console.warn("Error deleting citation from storage:", storageError);
+            }
+
+            await deleteDoc(fsDoc(db, "documents", docId));
+            setDocs(prev => prev.filter(d => d.id !== docId));
+        } catch (err: unknown) {
+            console.error("Error deleting citation:", err);
+            let message = "Delete failed";
+            if (err instanceof Error) {
+                if (err.message.includes("permission") || err.message.includes("Missing") || err.message.includes("insufficient")) {
+                    message = "Permission denied. Please check Firebase security rules. See FIREBASE_SECURITY_RULES.md";
+                } else {
+                    message = err.message;
+                }
+            }
+            setError(message);
+        }
+    };
+
+    return (
+        <div className="bg-white rounded-lg shadow-md p-3 sm:p-4">
+            <form onSubmit={handleUpload} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mb-3 sm:mb-4 pb-2 sm:pb-3 border-b border-slate-200">
+                <input
+                    type="file"
+                    name="citationfile"
+                    accept="image/*,.pdf,.doc,.docx"
+                    className="flex-1 rounded border border-slate-300 px-2 sm:px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                    required
+                />
+                <button
+                    type="submit"
+                    disabled={uploading}
+                    className="bg-slate-900 text-white rounded px-3 sm:px-4 py-2 hover:bg-slate-800 transition font-semibold shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-xs sm:text-sm"
+                >
+                    <FaUpload /> {uploading ? "Uploading..." : "Upload"}
+                </button>
+            </form>
+            {error && <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg mb-3 text-sm">{error}</div>}
+            {loading ? (
+                <div className="text-center py-6">
+                    <div className="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-slate-900"></div>
+                    <p className="mt-2 text-slate-600 text-sm">Loading citations...</p>
+                </div>
+            ) : docs.length === 0 ? (
+                <div className="text-center py-6 text-slate-500 text-sm">No citations added yet. Upload your first citation!</div>
+            ) : (
+                <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3">
+                        {docs.map((d) => {
+                            const isImage = d.isImage || d.type?.startsWith("image/");
+                            const isPDF = d.isPDF || d.name.toLowerCase().endsWith(".pdf");
+                            return (
+                                <div key={d.id} className="bg-slate-50 rounded border border-slate-200 hover:shadow-md transition overflow-hidden">
+                                    {isImage ? (
+                                        <div className="aspect-video bg-slate-200 relative group cursor-pointer" onClick={() => setPreviewDoc({ url: d.url, name: d.name, type: "image" })}>
+                                            <img src={d.url} alt={d.name} className="w-full h-full object-cover" />
+                                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition flex items-center justify-center">
+                                                <FaEye className="text-white opacity-0 group-hover:opacity-100 transition" />
+                                            </div>
+                                        </div>
+                                    ) : isPDF ? (
+                                        <div className="aspect-video bg-red-50 flex items-center justify-center cursor-pointer" onClick={() => setPreviewDoc({ url: d.url, name: d.name, type: "pdf" })}>
+                                            <div className="text-center">
+                                                <FaFilePdf className="text-red-600 text-3xl mx-auto mb-1" />
+                                                <p className="text-xs text-slate-600">Click to preview</p>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="aspect-video bg-slate-200 flex items-center justify-center">
+                                            <FaFileAlt className="text-slate-400 text-3xl" />
+                                        </div>
+                                    )}
+                                    <div className="p-3">
+                                        <p className="font-medium text-slate-900 text-xs mb-1.5 truncate" title={d.name}>{d.name}</p>
+                                        <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-2">
+                                            {d.size && <span>{(d.size / 1024).toFixed(1)} KB</span>}
+                                            {d.uploadedAt && (
+                                                <span>• {new Date(d.uploadedAt.toMillis()).toLocaleDateString()}</span>
+                                            )}
+                                        </div>
+                                        <div className="flex gap-1.5">
+                                            <button
+                                                onClick={() => setPreviewDoc({ url: d.url, name: d.name, type: isImage ? "image" : isPDF ? "pdf" : "file" })}
+                                                className="flex-1 bg-slate-900 text-white rounded px-2 py-1.5 hover:bg-slate-800 transition font-medium text-xs flex items-center justify-center gap-1"
+                                            >
+                                                <FaEye className="text-xs" /> View
+                                            </button>
+                                            <a
+                                                href={d.url}
+                                                download
+                                                className="bg-blue-600 text-white rounded px-2 py-1.5 hover:bg-blue-700 transition font-medium text-xs flex items-center justify-center"
+                                                title="Download"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <FaDownload className="text-xs" />
+                                            </a>
+                                            <button
+                                                className="bg-red-600 text-white rounded px-2 py-1.5 hover:bg-red-700 transition font-medium text-xs flex items-center justify-center"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDelete(d.id, d.url);
+                                                }}
+                                                title="Delete"
+                                            >
+                                                <FaTrash className="text-xs" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
                     {previewDoc && (
                         <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-2 sm:p-4" onClick={() => setPreviewDoc(null)}>
                             <div className="bg-white rounded-lg max-w-4xl w-full max-h-[95vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
