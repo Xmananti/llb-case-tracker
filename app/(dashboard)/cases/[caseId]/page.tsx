@@ -435,8 +435,12 @@ const CaseDocumentsTab: React.FC<{ caseId: string }> = ({ caseId }) => {
                     url: data.url,
                     uploadedBy: data.uploadedBy,
                     uploadedAt: data.uploadedAt,
-                    path: data.path
-                } as DocumentResource;
+                    path: data.path,
+                    type: data.type,
+                    size: data.size,
+                    isImage: data.isImage,
+                    isPDF: data.isPDF,
+                } as DocumentResource & { isImage?: boolean; isPDF?: boolean };
             }));
         } catch (err: unknown) {
             let message = "Upload failed";
@@ -727,8 +731,12 @@ const CaseCitationsTab: React.FC<{ caseId: string }> = ({ caseId }) => {
                     uploadedBy: data.uploadedBy,
                     uploadedAt: data.uploadedAt,
                     path: data.path,
+                    type: data.type,
+                    size: data.size,
+                    isImage: data.isImage,
+                    isPDF: data.isPDF,
                     category: data.category,
-                } as DocumentResource & { category?: string };
+                } as DocumentResource & { isImage?: boolean; isPDF?: boolean; category?: string };
             });
             const citationDocs = allDocs.filter(doc =>
                 doc.category === "citation" ||

@@ -317,18 +317,28 @@ const CasesPage: React.FC = () => {
             let newCaseId: string | undefined;
             // Prepare form data, ensuring status is valid
             const validStatuses = ["pending", "admitted", "dismissed", "allowed", "disposed", "withdrawn", "compromised", "stayed", "appeal_filed"];
+
+            // Build a backend-friendly description from the split fields
+            const generatedDescription =
+                form.description ||
+                [
+                    form.plaintiffCase && `Plaintiff Case: ${form.plaintiffCase}`,
+                    form.defendantCase && `Defendant Case: ${form.defendantCase}`,
+                    form.workToBeDone && `Work to be Done: ${form.workToBeDone}`,
+                ]
+                    .filter(Boolean)
+                    .join("\n\n");
+
+            // Frontend validation to match backend .min(2) rule
+            if (!generatedDescription || generatedDescription.trim().length < 2) {
+                setUploading(false);
+                setError("Please enter at least some description in Plaintiff Case, Defendant Case, or Work to be Done.");
+                return;
+            }
+
             const caseData = {
                 ...form,
-                // keep backend-friendly description in sync
-                description:
-                    form.description ||
-                    [
-                        form.plaintiffCase && `Plaintiff Case: ${form.plaintiffCase}`,
-                        form.defendantCase && `Defendant Case: ${form.defendantCase}`,
-                        form.workToBeDone && `Work to be Done: ${form.workToBeDone}`,
-                    ]
-                        .filter(Boolean)
-                        .join("\n\n"),
+                description: generatedDescription,
                 userId: user.uid,
                 // Ensure status is valid or undefined
                 status: form.status && validStatuses.includes(form.status) ? form.status : "pending"
