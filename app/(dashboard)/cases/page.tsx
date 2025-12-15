@@ -12,11 +12,12 @@ interface Case {
     id: string;
     title: string;
     description: string;
+    plaintiffCase?: string;
+    defendantCase?: string;
+    workToBeDone?: string;
     caseNumber?: string;
     caseCategory?: string;
     court?: string;
-    courtComplex?: string;
-    benchJudgeName?: string;
     plaintiff?: string;
     defendant?: string;
     petitioner?: string;
@@ -26,12 +27,11 @@ interface Case {
     advocateForPetitioner?: string;
     advocateForRespondent?: string;
     publicProsecutor?: string;
-    seniorCounsel?: string;
-    vakalatFiled?: boolean;
     currentStage?: string;
     lastHearingDate?: string;
     nextHearingDate?: string;
     hearingPurpose?: string;
+    purposeOfHearingStage?: string;
     notes?: string;
     caseType?: string;
     status?: "pending" | "admitted" | "dismissed" | "allowed" | "disposed" | "withdrawn" | "compromised" | "stayed" | "appeal_filed";
@@ -51,11 +51,12 @@ const CasesPage: React.FC = () => {
     const [form, setForm] = useState<{
         title: string;
         description: string;
+        plaintiffCase: string;
+        defendantCase: string;
+        workToBeDone: string;
         caseNumber: string;
         caseCategory: string;
         court: string;
-        courtComplex: string;
-        benchJudgeName: string;
         plaintiff: string;
         defendant: string;
         petitioner: string;
@@ -65,12 +66,11 @@ const CasesPage: React.FC = () => {
         advocateForPetitioner: string;
         advocateForRespondent: string;
         publicProsecutor: string;
-        seniorCounsel: string;
-        vakalatFiled: boolean;
         currentStage: string;
         lastHearingDate: string;
         nextHearingDate: string;
         hearingPurpose: string;
+        purposeOfHearingStage: string;
         notes: string;
         caseType: string;
         status: "pending" | "admitted" | "dismissed" | "allowed" | "disposed" | "withdrawn" | "compromised" | "stayed" | "appeal_filed";
@@ -78,11 +78,12 @@ const CasesPage: React.FC = () => {
     }>({
         title: "",
         description: "",
+        plaintiffCase: "",
+        defendantCase: "",
+        workToBeDone: "",
         caseNumber: "",
         caseCategory: "",
         court: "",
-        courtComplex: "",
-        benchJudgeName: "",
         plaintiff: "",
         defendant: "",
         petitioner: "",
@@ -92,12 +93,11 @@ const CasesPage: React.FC = () => {
         advocateForPetitioner: "",
         advocateForRespondent: "",
         publicProsecutor: "",
-        seniorCounsel: "",
-        vakalatFiled: false,
         currentStage: "",
         lastHearingDate: "",
         nextHearingDate: "",
         hearingPurpose: "",
+        purposeOfHearingStage: "",
         notes: "",
         caseType: "",
         status: "pending",
@@ -105,6 +105,7 @@ const CasesPage: React.FC = () => {
     });
     const [editId, setEditId] = useState<string | null>(null);
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+    const [selectedCitationFiles, setSelectedCitationFiles] = useState<File[]>([]);
     const [uploading, setUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
     const [caseStats, setCaseStats] = useState<{ [caseId: string]: { documents: number; hearings: number; tasks: number; conversations: number } }>({});
@@ -219,11 +220,12 @@ const CasesPage: React.FC = () => {
             setForm({
                 title: "",
                 description: "",
+                plaintiffCase: "",
+                defendantCase: "",
+                workToBeDone: "",
                 caseNumber: "",
                 caseCategory: "",
                 court: "",
-                courtComplex: "",
-                benchJudgeName: "",
                 plaintiff: "",
                 defendant: "",
                 petitioner: "",
@@ -233,12 +235,11 @@ const CasesPage: React.FC = () => {
                 advocateForPetitioner: "",
                 advocateForRespondent: "",
                 publicProsecutor: "",
-                seniorCounsel: "",
-                vakalatFiled: false,
                 currentStage: "",
                 lastHearingDate: "",
                 nextHearingDate: "",
                 hearingPurpose: "",
+                purposeOfHearingStage: "",
                 notes: "",
                 caseType: "",
                 status: "pending",
@@ -252,6 +253,21 @@ const CasesPage: React.FC = () => {
             window.history.replaceState({}, "", url.pathname + url.search);
         }
     }, [searchParams, user]);
+
+    // Check if "edit" query parameter is present to open the modal in edit mode
+    useEffect(() => {
+        const editParam = searchParams?.get("edit");
+        if (editParam && user && cases.length > 0) {
+            const existing = cases.find(c => c.id === editParam);
+            if (existing) {
+                handleEdit(existing);
+                // Remove the query parameter from URL without reload
+                const url = new URL(window.location.href);
+                url.searchParams.delete("edit");
+                window.history.replaceState({}, "", url.pathname + url.search);
+            }
+        }
+    }, [searchParams, user, cases]);
 
     // Filter cases based on local search query
     useEffect(() => {
@@ -303,6 +319,16 @@ const CasesPage: React.FC = () => {
             const validStatuses = ["pending", "admitted", "dismissed", "allowed", "disposed", "withdrawn", "compromised", "stayed", "appeal_filed"];
             const caseData = {
                 ...form,
+                // keep backend-friendly description in sync
+                description:
+                    form.description ||
+                    [
+                        form.plaintiffCase && `Plaintiff Case: ${form.plaintiffCase}`,
+                        form.defendantCase && `Defendant Case: ${form.defendantCase}`,
+                        form.workToBeDone && `Work to be Done: ${form.workToBeDone}`,
+                    ]
+                        .filter(Boolean)
+                        .join("\n\n"),
                 userId: user.uid,
                 // Ensure status is valid or undefined
                 status: form.status && validStatuses.includes(form.status) ? form.status : "pending"
@@ -368,15 +394,50 @@ const CasesPage: React.FC = () => {
                 }
             }
 
+            // Upload citations if any were selected (store as documents with category=citation)
+            if (selectedCitationFiles.length > 0 && newCaseId) {
+                const { getFirestore, collection, addDoc, Timestamp } = await import("firebase/firestore");
+                const { app } = await import("../../../lib/firebase/config");
+                const db = getFirestore(app);
+
+                for (let i = 0; i < selectedCitationFiles.length; i++) {
+                    const file = selectedCitationFiles[i];
+                    try {
+                        const { url, path } = await uploadCaseDocument(newCaseId, file);
+                        const fileType = file.type || "";
+                        const isImage = fileType.startsWith("image/");
+                        const isPDF = fileType === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+
+                        await addDoc(collection(db, "documents"), {
+                            caseId: newCaseId,
+                            name: file.name,
+                            url: url,
+                            uploadedBy: user.uid,
+                            uploadedAt: Timestamp.now(),
+                            path: path,
+                            type: fileType || "unknown",
+                            size: file.size,
+                            isImage,
+                            isPDF,
+                            category: "citation",
+                        });
+                    } catch (uploadError) {
+                        console.error("Error uploading citation file:", uploadError);
+                        setError(`Failed to upload citation ${file.name}. You can try uploading it later from the case details page.`);
+                    }
+                }
+            }
+
             setShowModal(false);
             setForm({
                 title: "",
                 description: "",
+                plaintiffCase: "",
+                defendantCase: "",
+                workToBeDone: "",
                 caseNumber: "",
                 caseCategory: "",
                 court: "",
-                courtComplex: "",
-                benchJudgeName: "",
                 plaintiff: "",
                 defendant: "",
                 petitioner: "",
@@ -386,18 +447,18 @@ const CasesPage: React.FC = () => {
                 advocateForPetitioner: "",
                 advocateForRespondent: "",
                 publicProsecutor: "",
-                seniorCounsel: "",
-                vakalatFiled: false,
                 currentStage: "",
                 lastHearingDate: "",
                 nextHearingDate: "",
                 hearingPurpose: "",
+                purposeOfHearingStage: "",
                 notes: "",
                 caseType: "",
                 status: "pending",
                 filingDate: "",
             });
             setSelectedFiles([]);
+            setSelectedCitationFiles([]);
             setUploadProgress({});
             setEditId(null);
 
@@ -458,12 +519,13 @@ const CasesPage: React.FC = () => {
         setEditId(c.id);
         setForm({
             title: c.title,
-            description: c.description,
+            description: c.description || "",
+            plaintiffCase: (c as any).plaintiffCase || "",
+            defendantCase: (c as any).defendantCase || "",
+            workToBeDone: (c as any).workToBeDone || "",
             caseNumber: c.caseNumber || "",
             caseCategory: c.caseCategory || "",
             court: c.court || "",
-            courtComplex: c.courtComplex || "",
-            benchJudgeName: c.benchJudgeName || "",
             plaintiff: c.plaintiff || "",
             defendant: c.defendant || "",
             petitioner: c.petitioner || "",
@@ -473,12 +535,11 @@ const CasesPage: React.FC = () => {
             advocateForPetitioner: c.advocateForPetitioner || "",
             advocateForRespondent: c.advocateForRespondent || "",
             publicProsecutor: c.publicProsecutor || "",
-            seniorCounsel: c.seniorCounsel || "",
-            vakalatFiled: c.vakalatFiled || false,
             currentStage: c.currentStage || "",
             lastHearingDate: c.lastHearingDate || "",
             nextHearingDate: c.nextHearingDate || "",
             hearingPurpose: c.hearingPurpose || "",
+            purposeOfHearingStage: (c as any).purposeOfHearingStage || "",
             notes: c.notes || "",
             caseType: c.caseType || "",
             status: c.status || "pending",
@@ -644,11 +705,12 @@ const CasesPage: React.FC = () => {
                             setForm({
                                 title: "",
                                 description: "",
+                                plaintiffCase: "",
+                                defendantCase: "",
+                                workToBeDone: "",
                                 caseNumber: "",
                                 caseCategory: "",
                                 court: "",
-                                courtComplex: "",
-                                benchJudgeName: "",
                                 plaintiff: "",
                                 defendant: "",
                                 petitioner: "",
@@ -658,18 +720,18 @@ const CasesPage: React.FC = () => {
                                 advocateForPetitioner: "",
                                 advocateForRespondent: "",
                                 publicProsecutor: "",
-                                seniorCounsel: "",
-                                vakalatFiled: false,
                                 currentStage: "",
                                 lastHearingDate: "",
                                 nextHearingDate: "",
                                 hearingPurpose: "",
+                                purposeOfHearingStage: "",
                                 notes: "",
                                 caseType: "",
                                 status: "pending",
                                 filingDate: "",
                             });
                             setSelectedFiles([]);
+                            setSelectedCitationFiles([]);
                             setShowModal(true);
                         }}
                     >
@@ -817,9 +879,9 @@ const CasesPage: React.FC = () => {
                                                     </span>
                                                 </div>
                                             )}
-                                            {c.nextHearingDate && (
+                                            {c.purposeOfHearingStage && (
                                                 <div className="flex items-center gap-1.5">
-                                                    <FaCalendarAlt className="text-amber-600 flex-shrink-0" /> <span>Next: {new Date(c.nextHearingDate).toLocaleDateString()}</span>
+                                                    <FaCalendarAlt className="text-amber-600 flex-shrink-0" /> <span>Purpose: {c.purposeOfHearingStage}</span>
                                                 </div>
                                             )}
                                         </div>
@@ -927,22 +989,13 @@ const CasesPage: React.FC = () => {
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                             <div className="md:col-span-2">
-                                <label className="block text-xs font-semibold text-slate-700 mb-1">Case Title *</label>
+                                <label className="block text-xs font-semibold text-slate-700 mb-1">Case Title - Cause Title *</label>
                                 <input
                                     className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
                                     value={form.title}
                                     onChange={e => setForm({ ...form, title: e.target.value })}
                                     required
                                     placeholder="e.g., Smith vs. Jones"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-semibold text-slate-700 mb-1">Case Number <span className="text-slate-500 font-normal">(Optional)</span></label>
-                                <input
-                                    className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                    value={form.caseNumber}
-                                    onChange={e => setForm({ ...form, caseNumber: e.target.value })}
-                                    placeholder="e.g., CV-2024-001"
                                 />
                             </div>
                             <div>
@@ -960,6 +1013,15 @@ const CasesPage: React.FC = () => {
                                     <option value="Revision">Revision</option>
                                     <option value="Miscellaneous Case">Miscellaneous Case</option>
                                 </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-700 mb-1">Case Number <span className="text-slate-500 font-normal">(Optional)</span></label>
+                                <input
+                                    className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                                    value={form.caseNumber}
+                                    onChange={e => setForm({ ...form, caseNumber: e.target.value })}
+                                    placeholder="e.g., CV-2024-001"
+                                />
                             </div>
                             <div>
                                 <label className="block text-sm font-semibold text-slate-700 mb-1">Case Category <span className="text-slate-500 font-normal text-xs">(Optional)</span></label>
@@ -981,7 +1043,7 @@ const CasesPage: React.FC = () => {
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Court Name <span className="text-slate-500 font-normal text-xs">(Optional)</span></label>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">Court <span className="text-slate-500 font-normal text-xs">(Optional)</span></label>
                                 <input
                                     className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
                                     value={form.court}
@@ -989,194 +1051,50 @@ const CasesPage: React.FC = () => {
                                     placeholder="e.g., District & Sessions Court, High Court of Telangana"
                                 />
                             </div>
-                            <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Court Complex <span className="text-slate-500 font-normal text-xs">(Optional)</span></label>
-                                <input
-                                    className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                    value={form.courtComplex}
-                                    onChange={e => setForm({ ...form, courtComplex: e.target.value })}
-                                    placeholder="e.g., City Civil Court, Ranga Reddy District"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Bench / Judge Name <span className="text-slate-500 font-normal text-xs">(Optional)</span></label>
-                                <input
-                                    className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                    value={form.benchJudgeName}
-                                    onChange={e => setForm({ ...form, benchJudgeName: e.target.value })}
-                                    placeholder="e.g., Single Bench / Division Bench / Hon'ble Justice XYZ"
-                                />
-                            </div>
                             <div className="md:col-span-2">
                                 <label className="block text-sm font-semibold text-slate-700 mb-1">Parties <span className="text-slate-500 font-normal text-xs">(Optional)</span></label>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    {(form.caseType === "Civil" || !form.caseType) && (
-                                        <>
-                                            <div>
-                                                <label className="block text-xs text-slate-600 mb-1">Plaintiff <span className="text-slate-400">(Optional)</span></label>
-                                                <input
-                                                    className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                                    value={form.plaintiff}
-                                                    onChange={e => setForm({ ...form, plaintiff: e.target.value })}
-                                                    placeholder="Name of plaintiff"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs text-slate-600 mb-1">Defendant <span className="text-slate-400">(Optional)</span></label>
-                                                <input
-                                                    className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                                    value={form.defendant}
-                                                    onChange={e => setForm({ ...form, defendant: e.target.value })}
-                                                    placeholder="Name of defendant"
-                                                />
-                                            </div>
-                                        </>
-                                    )}
-                                    {(form.caseType === "Writ Petition" || form.caseType === "Appeal" || form.caseType === "Revision") && (
-                                        <>
-                                            <div>
-                                                <label className="block text-xs text-slate-600 mb-1">Petitioner <span className="text-slate-400">(Optional)</span></label>
-                                                <input
-                                                    className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                                    value={form.petitioner}
-                                                    onChange={e => setForm({ ...form, petitioner: e.target.value })}
-                                                    placeholder="Name of petitioner"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs text-slate-600 mb-1">Respondent <span className="text-slate-400">(Optional)</span></label>
-                                                <input
-                                                    className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                                    value={form.respondent}
-                                                    onChange={e => setForm({ ...form, respondent: e.target.value })}
-                                                    placeholder="Name of respondent"
-                                                />
-                                            </div>
-                                        </>
-                                    )}
-                                    {form.caseType === "Criminal" && (
-                                        <>
-                                            <div>
-                                                <label className="block text-xs text-slate-600 mb-1">Complainant <span className="text-slate-400">(Optional)</span></label>
-                                                <input
-                                                    className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                                    value={form.complainant}
-                                                    onChange={e => setForm({ ...form, complainant: e.target.value })}
-                                                    placeholder="Name of complainant"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs text-slate-600 mb-1">Accused <span className="text-slate-400">(Optional)</span></label>
-                                                <input
-                                                    className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                                    value={form.accused}
-                                                    onChange={e => setForm({ ...form, accused: e.target.value })}
-                                                    placeholder="Name of accused"
-                                                />
-                                            </div>
-                                        </>
-                                    )}
+                                    <div>
+                                        <label className="block text-xs text-slate-600 mb-1">Plaintiff <span className="text-slate-400">(Optional)</span></label>
+                                        <input
+                                            className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                                            value={form.plaintiff}
+                                            onChange={e => setForm({ ...form, plaintiff: e.target.value })}
+                                            placeholder="Name of plaintiff"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs text-slate-600 mb-1">Defendant <span className="text-slate-400">(Optional)</span></label>
+                                        <input
+                                            className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                                            value={form.defendant}
+                                            onChange={e => setForm({ ...form, defendant: e.target.value })}
+                                            placeholder="Name of defendant"
+                                        />
+                                    </div>
                                 </div>
                             </div>
                             <div className="md:col-span-2">
                                 <label className="block text-sm font-semibold text-slate-700 mb-1">Advocate Details <span className="text-slate-500 font-normal text-xs">(Optional)</span></label>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    {(form.caseType === "Civil" || !form.caseType) && (
-                                        <>
-                                            <div>
-                                                <label className="block text-xs text-slate-600 mb-1">Advocate for Plaintiff <span className="text-slate-400">(Optional)</span></label>
-                                                <input
-                                                    className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                                    value={form.advocateForPetitioner}
-                                                    onChange={e => setForm({ ...form, advocateForPetitioner: e.target.value })}
-                                                    placeholder="Advocate name"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs text-slate-600 mb-1">Advocate for Defendant <span className="text-slate-400">(Optional)</span></label>
-                                                <input
-                                                    className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                                    value={form.advocateForRespondent}
-                                                    onChange={e => setForm({ ...form, advocateForRespondent: e.target.value })}
-                                                    placeholder="Advocate name"
-                                                />
-                                            </div>
-                                        </>
-                                    )}
-                                    {(form.caseType === "Writ Petition" || form.caseType === "Appeal" || form.caseType === "Revision") && (
-                                        <>
-                                            <div>
-                                                <label className="block text-xs text-slate-600 mb-1">Advocate for Petitioner <span className="text-slate-400">(Optional)</span></label>
-                                                <input
-                                                    className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                                    value={form.advocateForPetitioner}
-                                                    onChange={e => setForm({ ...form, advocateForPetitioner: e.target.value })}
-                                                    placeholder="Advocate name"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs text-slate-600 mb-1">Advocate for Respondent <span className="text-slate-400">(Optional)</span></label>
-                                                <input
-                                                    className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                                    value={form.advocateForRespondent}
-                                                    onChange={e => setForm({ ...form, advocateForRespondent: e.target.value })}
-                                                    placeholder="Advocate name"
-                                                />
-                                            </div>
-                                        </>
-                                    )}
-                                    {form.caseType === "Criminal" && (
-                                        <>
-                                            <div>
-                                                <label className="block text-xs text-slate-600 mb-1">Advocate for Complainant <span className="text-slate-400">(Optional)</span></label>
-                                                <input
-                                                    className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                                    value={form.advocateForPetitioner}
-                                                    onChange={e => setForm({ ...form, advocateForPetitioner: e.target.value })}
-                                                    placeholder="Advocate name"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs text-slate-600 mb-1">Advocate for Accused <span className="text-slate-400">(Optional)</span></label>
-                                                <input
-                                                    className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                                    value={form.advocateForRespondent}
-                                                    onChange={e => setForm({ ...form, advocateForRespondent: e.target.value })}
-                                                    placeholder="Advocate name"
-                                                />
-                                            </div>
-                                        </>
-                                    )}
-                                    {form.caseType === "Criminal" && (
-                                        <div>
-                                            <label className="block text-xs text-slate-600 mb-1">Public Prosecutor (PP) <span className="text-slate-400">(Optional)</span></label>
-                                            <input
-                                                className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                                value={form.publicProsecutor}
-                                                onChange={e => setForm({ ...form, publicProsecutor: e.target.value })}
-                                                placeholder="Public Prosecutor name"
-                                            />
-                                        </div>
-                                    )}
                                     <div>
-                                        <label className="block text-xs text-slate-600 mb-1">Senior Counsel <span className="text-slate-400">(Optional)</span></label>
+                                        <label className="block text-xs text-slate-600 mb-1">Advocate of Plaintiff <span className="text-slate-400">(Optional)</span></label>
                                         <input
                                             className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                            value={form.seniorCounsel}
-                                            onChange={e => setForm({ ...form, seniorCounsel: e.target.value })}
-                                            placeholder="Senior Counsel name (if any)"
+                                            value={form.advocateForPetitioner}
+                                            onChange={e => setForm({ ...form, advocateForPetitioner: e.target.value })}
+                                            placeholder="Advocate name"
                                         />
                                     </div>
-                                </div>
-                                <div className="mt-3 flex items-center gap-2">
-                                    <input
-                                        type="checkbox"
-                                        id="vakalatFiled"
-                                        checked={form.vakalatFiled}
-                                        onChange={e => setForm({ ...form, vakalatFiled: e.target.checked })}
-                                        className="rounded border-slate-300 text-amber-600 focus:ring-amber-500"
-                                    />
-                                    <label htmlFor="vakalatFiled" className="text-sm text-slate-700">Vakalat Filed</label>
+                                    <div>
+                                        <label className="block text-xs text-slate-600 mb-1">Advocate of Defendant <span className="text-slate-400">(Optional)</span></label>
+                                        <input
+                                            className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                                            value={form.advocateForRespondent}
+                                            onChange={e => setForm({ ...form, advocateForRespondent: e.target.value })}
+                                            placeholder="Advocate name"
+                                        />
+                                    </div>
                                 </div>
                             </div>
                             <div>
@@ -1231,48 +1149,45 @@ const CasesPage: React.FC = () => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Last Hearing Date <span className="text-slate-500 font-normal text-xs">(Optional)</span></label>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">Purpose of Hearing - Stage (Date) <span className="text-slate-500 font-normal text-xs">(Optional)</span></label>
                                 <input
-                                    type="date"
                                     className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                    value={form.lastHearingDate}
-                                    onChange={e => setForm({ ...form, lastHearingDate: e.target.value })}
+                                    value={form.purposeOfHearingStage}
+                                    onChange={e => setForm({ ...form, purposeOfHearingStage: e.target.value })}
+                                    placeholder="e.g., Arguments - 15/02/2025"
                                 />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Next Hearing Date <span className="text-slate-500 font-normal text-xs">(Optional)</span></label>
-                                <input
-                                    type="date"
-                                    className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                    value={form.nextHearingDate}
-                                    onChange={e => setForm({ ...form, nextHearingDate: e.target.value })}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Purpose of Hearing <span className="text-slate-500 font-normal text-xs">(Optional)</span></label>
-                                <select
-                                    className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                    value={form.hearingPurpose}
-                                    onChange={e => setForm({ ...form, hearingPurpose: e.target.value })}
-                                >
-                                    <option value="">Select Purpose</option>
-                                    <option value="Arguments">Arguments</option>
-                                    <option value="Evidence">Evidence</option>
-                                    <option value="Orders">Orders</option>
-                                    <option value="Admission">Admission</option>
-                                    <option value="Other">Other</option>
-                                </select>
                             </div>
                             <div className="md:col-span-2">
-                                <label className="block text-xs font-semibold text-slate-700 mb-1">Description *</label>
-                                <textarea
-                                    className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                    value={form.description}
-                                    onChange={e => setForm({ ...form, description: e.target.value })}
-                                    required
-                                    rows={3}
-                                    placeholder="Case details, summary, and important notes..."
-                                />
+                                <label className="block text-xs font-semibold text-slate-700 mb-1">Description</label>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
+                                    <div>
+                                        <label className="block text-xs text-slate-600 mb-1">Plaintiff Case</label>
+                                        <textarea
+                                            className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                                            value={form.plaintiffCase}
+                                            onChange={e => setForm({ ...form, plaintiffCase: e.target.value })}
+                                            rows={3}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs text-slate-600 mb-1">Defendant/Opponent Case</label>
+                                        <textarea
+                                            className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                                            value={form.defendantCase}
+                                            onChange={e => setForm({ ...form, defendantCase: e.target.value })}
+                                            rows={3}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="mt-3">
+                                    <label className="block text-xs text-slate-600 mb-1">Work to be Done</label>
+                                    <textarea
+                                        className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                                        value={form.workToBeDone}
+                                        onChange={e => setForm({ ...form, workToBeDone: e.target.value })}
+                                        rows={2}
+                                    />
+                                </div>
                             </div>
                             {!editId && (
                                 <div className="md:col-span-2">
@@ -1338,6 +1253,55 @@ const CasesPage: React.FC = () => {
                                                     );
                                                 })}
                                             </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                            {!editId && (
+                                <div className="md:col-span-2">
+                                    <label className="block text-xs font-semibold text-slate-700 mb-1">Citations (Optional)</label>
+                                    <div className="mt-1 border-2 border-dashed border-slate-300 rounded p-3">
+                                        <input
+                                            type="file"
+                                            multiple
+                                            accept="image/*,.pdf,.doc,.docx"
+                                            className="hidden"
+                                            id="case-citations"
+                                            onChange={(e) => {
+                                                const files = Array.from(e.target.files || []);
+                                                setSelectedCitationFiles(prev => [...prev, ...files]);
+                                            }}
+                                        />
+                                        <label
+                                            htmlFor="case-citations"
+                                            className="cursor-pointer flex flex-col items-center justify-center py-2"
+                                        >
+                                            <FaUpload className="text-xl text-slate-400 mb-1" />
+                                            <span className="text-xs text-slate-600">Click to upload citation files</span>
+                                            <span className="text-xs text-slate-500 mt-0.5">PDF, Images, Word, etc.</span>
+                                        </label>
+                                        {selectedCitationFiles.length > 0 && (
+                                            <details className="mt-2">
+                                                <summary className="text-xs text-slate-600 cursor-pointer select-none">
+                                                    View selected citations ({selectedCitationFiles.length})
+                                                </summary>
+                                                <div className="mt-2 space-y-1.5">
+                                                    {selectedCitationFiles.map((file, idx) => (
+                                                        <div key={idx} className="bg-slate-50 p-2 rounded text-xs flex items-center justify-between">
+                                                            <span className="text-slate-700 truncate flex-1">{file.name}</span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setSelectedCitationFiles(prev => prev.filter((_, i) => i !== idx));
+                                                                }}
+                                                                className="ml-2 text-red-600 hover:text-red-800"
+                                                            >
+                                                                <FaTimes className="text-xs" />
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </details>
                                         )}
                                     </div>
                                 </div>

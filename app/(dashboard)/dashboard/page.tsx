@@ -18,6 +18,8 @@ interface CaseDoc {
     nextHearingDate?: string;
 }
 
+type TimeRange = "all" | "last7" | "last30" | "last90";
+
 const DashboardHome: React.FC = () => {
     const { user, userData, loading: authLoading } = useAuth();
     const router = useRouter();
@@ -26,6 +28,7 @@ const DashboardHome: React.FC = () => {
     const [error, setError] = useState<string>("");
     const [searchQuery, setSearchQuery] = useState("");
     const [recentCases, setRecentCases] = useState<CaseDoc[]>([]);
+    const [timeRange, setTimeRange] = useState<TimeRange>("all");
     const searchInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -66,13 +69,13 @@ const DashboardHome: React.FC = () => {
 
                 setCases(casesData);
 
-                // Sort by updatedAt (most recent first) and take top 2
+                // Sort by updatedAt (most recent first) and take top 4
                 const sorted = [...casesData].sort((a, b) => {
                     const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
                     const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
                     return bTime - aTime;
                 });
-                setRecentCases(sorted.slice(0, 2));
+                setRecentCases(sorted.slice(0, 4));
             } catch (err) {
                 console.error("Error fetching cases:", err);
                 const errorMessage = err instanceof Error ? err.message : "Failed to fetch cases";
@@ -91,12 +94,32 @@ const DashboardHome: React.FC = () => {
         }
     };
 
-    const filteredRecentCases = recentCases.filter(c =>
-        searchQuery.trim() === "" ||
-        c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        c.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        c.caseNumber?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const isInRange = (dateStr: string | undefined, range: TimeRange) => {
+        if (range === "all") return true;
+        if (!dateStr) return false;
+        const date = new Date(dateStr);
+        const now = new Date();
+        const diffDays = (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24);
+
+        if (range === "last7") return diffDays <= 7;
+        if (range === "last30") return diffDays <= 30;
+        if (range === "last90") return diffDays <= 90;
+        return true;
+    };
+
+    const filteredCasesByRange = useMemo(() => {
+        if (timeRange === "all") return cases;
+        return cases.filter(c => isInRange(c.updatedAt || c.createdAt, timeRange));
+    }, [cases, timeRange]);
+
+    const filteredRecentCases = recentCases
+        .filter(c =>
+            searchQuery.trim() === "" ||
+            c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            c.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            c.caseNumber?.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+        .filter(c => isInRange(c.updatedAt || c.createdAt, timeRange));
 
     // Prepare chart data
     const statusColors: { [key: string]: string } = {
@@ -109,7 +132,7 @@ const DashboardHome: React.FC = () => {
     // Status distribution data
     const statusData = useMemo(() => {
         const statusCounts: { [key: string]: number } = {};
-        cases.forEach(c => {
+        filteredCasesByRange.forEach(c => {
             const status = c.status || "unknown";
             statusCounts[status] = (statusCounts[status] || 0) + 1;
         });
@@ -118,14 +141,14 @@ const DashboardHome: React.FC = () => {
             value,
             color: statusColors[name] || "#94a3b8",
         }));
-    }, [cases]);
+    }, [filteredCasesByRange]);
 
     // Upcoming hearings data (next 7 days)
     const upcomingHearings = useMemo(() => {
         const now = new Date();
         const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-        return cases
+        return filteredCasesByRange
             .filter(c => {
                 if (!c.nextHearingDate) return false;
                 const hearingDate = new Date(c.nextHearingDate);
@@ -144,7 +167,7 @@ const DashboardHome: React.FC = () => {
                 return dateA - dateB;
             })
             .slice(0, 5); // Top 5 upcoming
-    }, [cases]);
+    }, [filteredCasesByRange]);
 
     return (
         <div className="min-h-screen flex flex-col">
@@ -229,6 +252,96 @@ const DashboardHome: React.FC = () => {
                             </Link>
                         </div>
                     </form>
+
+                    {/* Recently Edited Cases */}
+                    {!loading && recentCases.length > 0 && (
+                        <div className="mt-8 sm:mt-12 w-full">
+                            {/* Time range filters */}
+                            <div className="flex justify-end mb-3 gap-2 text-xs sm:text-sm">
+                                {[
+                                    { id: "all", label: "All" },
+                                    { id: "last7", label: "Last 7 days" },
+                                    { id: "last30", label: "Last 30 days" },
+                                    { id: "last90", label: "Last 90 days" },
+                                ].map(opt => (
+                                    <button
+                                        key={opt.id}
+                                        type="button"
+                                        onClick={() => setTimeRange(opt.id as TimeRange)}
+                                        className={`px-2 py-1 rounded-full border transition-colors ${timeRange === opt.id
+                                            ? "bg-amber-600 text-white border-amber-600"
+                                            : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+                                            }`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-lg sm:text-xl font-semibold text-slate-900 flex items-center gap-2">
+                                    <FaClock className="text-amber-600" />
+                                    Recently Edited Cases
+                                </h3>
+                                <Link
+                                    href="/cases"
+                                    className="text-xs sm:text-sm text-amber-600 hover:text-amber-700 font-medium"
+                                >
+                                    View all →
+                                </Link>
+                            </div>
+
+                            {filteredRecentCases.length === 0 && searchQuery.trim() ? (
+                                <div className="bg-white rounded-lg border border-slate-200 p-6 text-center">
+                                    <FaFileAlt className="text-3xl text-slate-400 mx-auto mb-2" />
+                                    <p className="text-slate-600 text-sm">No cases found matching "{searchQuery}"</p>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                                    {filteredRecentCases.map(c => (
+                                        <Link
+                                            key={c.id}
+                                            href={`/cases/${c.id}`}
+                                            className="bg-white rounded-lg border border-slate-200 p-3 sm:p-4 hover:shadow-lg hover:border-amber-500 transition-all group"
+                                        >
+                                            <div className="flex items-start justify-between mb-2">
+                                                <h4 className="text-sm sm:text-base font-semibold text-slate-900 group-hover:text-amber-600 transition line-clamp-2 flex-1">
+                                                    {c.title}
+                                                </h4>
+                                                {c.status && (
+                                                    <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${c.status === "active" ? "bg-green-100 text-green-800" :
+                                                        c.status === "closed" ? "bg-gray-100 text-gray-800" :
+                                                            c.status === "pending" ? "bg-yellow-100 text-yellow-800" :
+                                                                "bg-orange-100 text-orange-800"
+                                                        }`}>
+                                                        {c.status}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {c.caseNumber && (
+                                                <p className="text-xs text-slate-500 mb-1.5">#{c.caseNumber}</p>
+                                            )}
+                                            <p className="text-xs sm:text-sm text-slate-600 line-clamp-2 mb-2">
+                                                {c.description}
+                                            </p>
+                                            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                                                <span className="text-xs text-slate-400">
+                                                    {c.updatedAt
+                                                        ? `Updated ${new Date(c.updatedAt).toLocaleDateString()}`
+                                                        : c.createdAt
+                                                            ? `Created ${new Date(c.createdAt).toLocaleDateString()}`
+                                                            : "No date"
+                                                    }
+                                                </span>
+                                                <span className="text-xs text-amber-600 font-medium group-hover:translate-x-1 transition-transform">
+                                                    View →
+                                                </span>
+                                            </div>
+                                        </Link>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Charts Section */}
                     {!loading && cases.length > 0 && (
@@ -336,75 +449,6 @@ const DashboardHome: React.FC = () => {
                                     <div className="text-center py-8 text-slate-500 text-sm">No status data available</div>
                                 )}
                             </div>
-                        </div>
-                    )}
-
-                    {/* Recently Edited Cases */}
-                    {!loading && recentCases.length > 0 && (
-                        <div className="mt-8 sm:mt-12 w-full">
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-lg sm:text-xl font-semibold text-slate-900 flex items-center gap-2">
-                                    <FaClock className="text-amber-600" />
-                                    Recently Edited Cases
-                                </h3>
-                                <Link
-                                    href="/cases"
-                                    className="text-xs sm:text-sm text-amber-600 hover:text-amber-700 font-medium"
-                                >
-                                    View all →
-                                </Link>
-                            </div>
-
-                            {filteredRecentCases.length === 0 && searchQuery.trim() ? (
-                                <div className="bg-white rounded-lg border border-slate-200 p-6 text-center">
-                                    <FaFileAlt className="text-3xl text-slate-400 mx-auto mb-2" />
-                                    <p className="text-slate-600 text-sm">No cases found matching "{searchQuery}"</p>
-                                </div>
-                            ) : (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                                    {filteredRecentCases.map(c => (
-                                        <Link
-                                            key={c.id}
-                                            href={`/cases/${c.id}`}
-                                            className="bg-white rounded-lg border border-slate-200 p-3 sm:p-4 hover:shadow-lg hover:border-amber-500 transition-all group"
-                                        >
-                                            <div className="flex items-start justify-between mb-2">
-                                                <h4 className="text-sm sm:text-base font-semibold text-slate-900 group-hover:text-amber-600 transition line-clamp-2 flex-1">
-                                                    {c.title}
-                                                </h4>
-                                                {c.status && (
-                                                    <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${c.status === "active" ? "bg-green-100 text-green-800" :
-                                                        c.status === "closed" ? "bg-gray-100 text-gray-800" :
-                                                            c.status === "pending" ? "bg-yellow-100 text-yellow-800" :
-                                                                "bg-orange-100 text-orange-800"
-                                                        }`}>
-                                                        {c.status}
-                                                    </span>
-                                                )}
-                                            </div>
-                                            {c.caseNumber && (
-                                                <p className="text-xs text-slate-500 mb-1.5">#{c.caseNumber}</p>
-                                            )}
-                                            <p className="text-xs sm:text-sm text-slate-600 line-clamp-2 mb-2">
-                                                {c.description}
-                                            </p>
-                                            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                                                <span className="text-xs text-slate-400">
-                                                    {c.updatedAt
-                                                        ? `Updated ${new Date(c.updatedAt).toLocaleDateString()}`
-                                                        : c.createdAt
-                                                            ? `Created ${new Date(c.createdAt).toLocaleDateString()}`
-                                                            : "No date"
-                                                    }
-                                                </span>
-                                                <span className="text-xs text-amber-600 font-medium group-hover:translate-x-1 transition-transform">
-                                                    View →
-                                                </span>
-                                            </div>
-                                        </Link>
-                                    ))}
-                                </div>
-                            )}
                         </div>
                     )}
 

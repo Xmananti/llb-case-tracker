@@ -5,6 +5,9 @@ import { z } from "zod";
 const caseSchema = z.object({
   title: z.string().min(2, "Case title is required"),
   description: z.string().min(2, "Description is required"),
+  plaintiffCase: z.string().optional(),
+  defendantCase: z.string().optional(),
+  workToBeDone: z.string().optional(),
   caseNumber: z.string().optional(),
   caseCategory: z.string().optional(), // O.S, C.C, S.C, Crl.P, W.P, etc.
   court: z.string().optional(),
@@ -25,6 +28,7 @@ const caseSchema = z.object({
   lastHearingDate: z.string().optional(),
   nextHearingDate: z.string().optional(),
   hearingPurpose: z.string().optional(),
+  purposeOfHearingStage: z.string().optional(),
   notes: z.string().optional(),
   caseType: z.string().optional(),
   status: z
@@ -62,6 +66,9 @@ export async function POST(req: NextRequest) {
   const {
     title,
     description,
+    plaintiffCase,
+    defendantCase,
+    workToBeDone,
     caseNumber,
     caseCategory,
     court,
@@ -82,6 +89,7 @@ export async function POST(req: NextRequest) {
     lastHearingDate,
     nextHearingDate,
     hearingPurpose,
+    purposeOfHearingStage,
     notes,
     caseType,
     status,
@@ -116,6 +124,9 @@ export async function POST(req: NextRequest) {
     const caseData = {
       title,
       description,
+      plaintiffCase: plaintiffCase || "",
+      defendantCase: defendantCase || "",
+      workToBeDone: workToBeDone || "",
       caseNumber: caseNumber || "",
       caseCategory: caseCategory || "",
       court: court || "",
@@ -136,6 +147,7 @@ export async function POST(req: NextRequest) {
       lastHearingDate: lastHearingDate || "",
       nextHearingDate: nextHearingDate || "",
       hearingPurpose: hearingPurpose || "",
+      purposeOfHearingStage: purposeOfHearingStage || "",
       notes: notes || "",
       caseType: caseType || "",
       status:
