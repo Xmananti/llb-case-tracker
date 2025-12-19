@@ -1,5 +1,6 @@
 # AdvocatePro
 
+
 A comprehensive case management application built with Next.js, Firebase, and TypeScript.
 
 ## Setup Instructions
