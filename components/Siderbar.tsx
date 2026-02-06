@@ -22,9 +22,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => {
 
     return (
         <>
-            <aside className={`bg-white h-screen w-64 shrink-0 border-r border-slate-200 shadow-sm fixed md:static z-50 transform transition-transform duration-300 ease-in-out ${isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+            <aside className={`bg-white w-64 shrink-0 border-r border-slate-200 shadow-sm fixed md:static z-50 transform transition-transform duration-300 ease-in-out flex flex-col top-0 bottom-0 md:h-full ${isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
                 }`}>
-                <div className="flex items-center justify-between p-4 border-b border-slate-200 md:hidden">
+                <div className="flex items-center justify-between p-4 border-b border-slate-200 md:hidden shrink-0">
                     <span className="font-bold text-slate-900">Menu</span>
                     <button
                         onClick={onClose}
@@ -34,7 +34,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => {
                         <FaTimes />
                     </button>
                 </div>
-                <nav className="flex flex-col p-3 sm:p-4 space-y-1 sm:space-y-2">
+                <nav className="flex flex-col p-3 sm:p-4 space-y-1 sm:space-y-2 overflow-y-auto flex-1">
                     {links.map((link) => {
                         const isActive = pathname === link.href || pathname?.startsWith(link.href + "/");
                         return (
@@ -42,7 +42,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => {
                                 key={link.href}
                                 href={link.href}
                                 onClick={onClose}
-                                className={`flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg transition-all text-sm sm:text-base ${isActive
+                                className={`flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg transition-all text-sm sm:text-base shrink-0 ${isActive
                                     ? "bg-slate-900 text-white shadow-md border-l-4 border-amber-500"
                                     : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
                                     }`}

@@ -12,6 +12,8 @@ const schema = z.object({
   caseNumber: z.string().optional(),
   caseCategory: z.string().optional(),
   court: z.string().optional(),
+  fileNumber: z.string().optional(),
+  year: z.string().optional(),
   courtComplex: z.string().optional(),
   benchJudgeName: z.string().optional(),
   plaintiff: z.string().optional(),
@@ -24,6 +26,7 @@ const schema = z.object({
   advocateForRespondent: z.string().optional(),
   publicProsecutor: z.string().optional(),
   seniorCounsel: z.string().optional(),
+  mobileNumber: z.string().optional(),
   vakalatFiled: z.boolean().optional(),
   currentStage: z.string().optional(),
   lastHearingDate: z.string().optional(),
@@ -68,6 +71,8 @@ export async function PATCH(req: NextRequest) {
     caseNumber,
     caseCategory,
     court,
+    fileNumber,
+    year,
     courtComplex,
     benchJudgeName,
     plaintiff,
@@ -80,6 +85,7 @@ export async function PATCH(req: NextRequest) {
     advocateForRespondent,
     publicProsecutor,
     seniorCounsel,
+  mobileNumber,
     vakalatFiled,
     currentStage,
     lastHearingDate,
@@ -126,6 +132,14 @@ export async function PATCH(req: NextRequest) {
           ? caseCategory || ""
           : existingCase.caseCategory || "",
       court: court || "",
+      fileNumber:
+        fileNumber !== undefined
+          ? fileNumber || ""
+          : existingCase.fileNumber || "",
+      year:
+        year !== undefined
+          ? year || ""
+          : existingCase.year || "",
       courtComplex:
         courtComplex !== undefined
           ? courtComplex || ""
@@ -166,6 +180,10 @@ export async function PATCH(req: NextRequest) {
         seniorCounsel !== undefined
           ? seniorCounsel || ""
           : existingCase.seniorCounsel || "",
+      mobileNumber:
+        mobileNumber !== undefined
+          ? mobileNumber || ""
+          : existingCase.mobileNumber || "",
       vakalatFiled:
         vakalatFiled !== undefined
           ? vakalatFiled

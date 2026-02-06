@@ -10,7 +10,7 @@ import type { Timestamp as TTimestamp } from "firebase/firestore";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { FaFileAlt, FaCalendarAlt, FaUser, FaBuilding, FaHashtag, FaTag, FaCheckCircle, FaClock, FaPauseCircle, FaUpload, FaTrash, FaDownload, FaEdit, FaFilePdf, FaComments, FaPaperPlane, FaEye, FaArrowLeft, FaTimes } from "react-icons/fa";
+import { FaFileAlt, FaCalendarAlt, FaUser, FaBuilding, FaHashtag, FaTag, FaCheckCircle, FaClock, FaPauseCircle, FaUpload, FaTrash, FaDownload, FaEdit, FaFilePdf, FaComments, FaPaperPlane, FaEye, FaArrowLeft, FaTimes, FaChevronDown, FaChevronUp } from "react-icons/fa";
 
 interface DocumentResource {
     id: string;
@@ -95,6 +95,7 @@ const CaseDetailsPage: React.FC = () => {
     const [caseData, setCaseData] = useState<CaseDoc | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string>("");
+    const [showAdditionalDetails, setShowAdditionalDetails] = useState(false);
 
     useEffect(() => {
         if (!user || !caseId) {
@@ -177,128 +178,281 @@ const CaseDetailsPage: React.FC = () => {
                         </button>
                     </div>
                     <div className="mb-4 bg-white rounded-lg shadow-md p-4 border-l-4 border-amber-500">
-                        <div className="flex justify-between items-start mb-3">
+                        <div className="flex justify-between items-start mb-4">
                             <div className="flex-1">
-                                <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mb-1.5 break-words">{caseData.title}</h1>
-                                <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
-                                    {caseData.caseNumber && (
-                                        <div className="flex items-center gap-2 text-slate-600">
-                                            <FaHashtag className="text-amber-600" /> {caseData.caseNumber}
-                                        </div>
-                                    )}
-                                    {caseData.status && (
-                                        <div className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1 ${caseData.status === "admitted" || caseData.status === "allowed" ? "bg-green-100 text-green-800" :
-                                            caseData.status === "dismissed" ? "bg-red-100 text-red-800" :
-                                                caseData.status === "disposed" ? "bg-gray-100 text-gray-800" :
-                                                    caseData.status === "withdrawn" ? "bg-orange-100 text-orange-800" :
-                                                        caseData.status === "compromised" ? "bg-blue-100 text-blue-800" :
-                                                            caseData.status === "stayed" ? "bg-yellow-100 text-yellow-800" :
-                                                                caseData.status === "appeal_filed" ? "bg-purple-100 text-purple-800" :
-                                                                    caseData.status === "pending" ? "bg-yellow-100 text-yellow-800" :
-                                                                        "bg-slate-100 text-slate-800"
-                                            }`}>
-                                            {caseData.status === "admitted" || caseData.status === "allowed" ? <FaCheckCircle /> :
-                                                caseData.status === "dismissed" ? <FaTimes /> :
-                                                    caseData.status === "disposed" ? <FaCheckCircle /> :
-                                                        caseData.status === "withdrawn" ? <FaClock /> :
-                                                            caseData.status === "compromised" ? <FaCheckCircle /> :
-                                                                caseData.status === "stayed" ? <FaPauseCircle /> :
-                                                                    caseData.status === "appeal_filed" ? <FaFileAlt /> :
-                                                                        caseData.status === "pending" ? <FaClock /> :
-                                                                            <FaClock />}
-                                            <span className="capitalize">{caseData.status.replace("_", " ")}</span>
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="mt-3 pt-3 border-t border-slate-200">
-                                    <h2 className="text-sm font-semibold text-slate-800 mb-2">Description</h2>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                                        {(caseData.plaintiffCase || caseData.description) && (
-                                            <div>
-                                                <h3 className="font-semibold text-slate-700 mb-1">Plaintiff Case</h3>
-                                                <p className="text-slate-600 whitespace-pre-wrap">
-                                                    {caseData.plaintiffCase || caseData.description}
-                                                </p>
-                                            </div>
-                                        )}
-                                        {caseData.defendantCase && (
-                                            <div>
-                                                <h3 className="font-semibold text-slate-700 mb-1">Defendant/Opponent Case</h3>
-                                                <p className="text-slate-600 whitespace-pre-wrap">
-                                                    {caseData.defendantCase}
-                                                </p>
-                                            </div>
-                                        )}
-                                    </div>
-                                    {caseData.workToBeDone && (
-                                        <div className="mt-3">
-                                            <h3 className="font-semibold text-slate-700 mb-1">Work to be Done</h3>
-                                            <p className="text-slate-600 text-sm whitespace-pre-wrap">
-                                                {caseData.workToBeDone}
-                                            </p>
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-3 border-t border-slate-200 text-sm mt-3">
-                                    {caseData.court && (
-                                        <div className="flex items-center gap-2 text-slate-700">
-                                            <FaBuilding className="text-amber-600" />
-                                            <span className="font-semibold">Court:</span> {caseData.court}
-                                        </div>
-                                    )}
-                                    {caseData.plaintiff && (
-                                        <div className="flex items-center gap-2 text-slate-700">
-                                            <FaUser className="text-amber-600" />
-                                            <span className="font-semibold">Plaintiff:</span> {caseData.plaintiff}
-                                        </div>
-                                    )}
-                                    {caseData.defendant && (
-                                        <div className="flex items-center gap-2 text-slate-700">
-                                            <FaUser className="text-amber-600" />
-                                            <span className="font-semibold">Defendant:</span> {caseData.defendant}
-                                        </div>
-                                    )}
-                                    {caseData.currentStage && (
-                                        <div className="flex items-center gap-2 text-slate-700">
-                                            <FaFileAlt className="text-amber-600" />
-                                            <span className="font-semibold">Current Stage:</span> {caseData.currentStage}
-                                        </div>
-                                    )}
-                                    {caseData.caseType && (
-                                        <div className="flex items-center gap-2 text-slate-700">
-                                            <FaTag className="text-amber-600" />
-                                            <span className="font-semibold">Type:</span> {caseData.caseType}
-                                        </div>
-                                    )}
-                                    {caseData.filingDate && (
-                                        <div className="flex items-center gap-2 text-slate-700">
-                                            <FaCalendarAlt className="text-amber-600" />
-                                            <span className="font-semibold">Filing Date:</span> {new Date(caseData.filingDate).toLocaleDateString()}
-                                        </div>
-                                    )}
-                                    {caseData.purposeOfHearingStage && (
-                                        <div className="flex items-start gap-2 text-amber-700">
-                                            <FaCalendarAlt className="mt-0.5" />
-                                            <div className="flex flex-col">
-                                                <span className="font-semibold text-xs sm:text-sm">
-                                                    Purpose of Hearing - Stage (Date)
-                                                </span>
-                                                <span className="text-xs sm:text-sm text-amber-800 whitespace-pre-wrap">
-                                                    {caseData.purposeOfHearingStage}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                                {caseData.notes && (
-                                    <div className="mt-3 pt-3 border-t border-slate-200">
-                                        <div className="text-sm">
-                                            <span className="font-semibold text-slate-700">Notes / Remarks:</span>
-                                            <p className="text-slate-600 mt-1 whitespace-pre-wrap">{caseData.notes}</p>
-                                        </div>
+                                <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mb-2 break-words">{caseData.title}</h1>
+                                {caseData.status && (
+                                    <div className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold mb-4 ${caseData.status === "admitted" || caseData.status === "allowed" ? "bg-green-100 text-green-800" :
+                                        caseData.status === "dismissed" ? "bg-red-100 text-red-800" :
+                                            caseData.status === "disposed" ? "bg-gray-100 text-gray-800" :
+                                                caseData.status === "withdrawn" ? "bg-orange-100 text-orange-800" :
+                                                    caseData.status === "compromised" ? "bg-blue-100 text-blue-800" :
+                                                        caseData.status === "stayed" ? "bg-yellow-100 text-yellow-800" :
+                                                            caseData.status === "appeal_filed" ? "bg-purple-100 text-purple-800" :
+                                                                caseData.status === "pending" ? "bg-yellow-100 text-yellow-800" :
+                                                                    "bg-slate-100 text-slate-800"
+                                        }`}>
+                                        {caseData.status === "admitted" || caseData.status === "allowed" ? <FaCheckCircle /> :
+                                            caseData.status === "dismissed" ? <FaTimes /> :
+                                                caseData.status === "disposed" ? <FaCheckCircle /> :
+                                                    caseData.status === "withdrawn" ? <FaClock /> :
+                                                        caseData.status === "compromised" ? <FaCheckCircle /> :
+                                                            caseData.status === "stayed" ? <FaPauseCircle /> :
+                                                                caseData.status === "appeal_filed" ? <FaFileAlt /> :
+                                                                    caseData.status === "pending" ? <FaClock /> :
+                                                                        <FaClock />}
+                                        <span className="capitalize">{caseData.status.replace("_", " ")}</span>
                                     </div>
                                 )}
                             </div>
+                        </div>
+
+                        {/* Primary Information Section */}
+                        <div className="bg-amber-50 rounded-lg p-4 mb-4 border border-amber-200">
+                            <h2 className="text-sm font-bold text-slate-800 mb-3 uppercase tracking-wide">Primary Information</h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {caseData.court && (
+                                    <div className="flex items-start gap-3">
+                                        <FaBuilding className="text-amber-600 mt-0.5 shrink-0" />
+                                        <div>
+                                            <span className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1">Court</span>
+                                            <span className="text-base font-semibold text-slate-900">{caseData.court}</span>
+                                        </div>
+                                    </div>
+                                )}
+                                {caseData.caseNumber && (
+                                    <div className="flex items-start gap-3">
+                                        <FaHashtag className="text-amber-600 mt-0.5 shrink-0" />
+                                        <div>
+                                            <span className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1">Case Number</span>
+                                            <span className="text-base font-semibold text-slate-900">{caseData.caseNumber}</span>
+                                        </div>
+                                    </div>
+                                )}
+                                {(caseData.plaintiff || caseData.petitioner || caseData.complainant) && (
+                                    <div className="flex items-start gap-3">
+                                        <FaUser className="text-amber-600 mt-0.5 shrink-0" />
+                                        <div>
+                                            <span className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1">
+                                                {caseData.plaintiff ? "Plaintiff" : caseData.petitioner ? "Petitioner" : "Complainant"}
+                                            </span>
+                                            <span className="text-base font-semibold text-slate-900">
+                                                {caseData.plaintiff || caseData.petitioner || caseData.complainant}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+                                <div className="flex items-start gap-3 md:col-span-2">
+                                    <FaFileAlt className="text-amber-600 mt-0.5 shrink-0" />
+                                    <div className="flex-1">
+                                        <span className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1">Work to be Done</span>
+                                        {caseData.workToBeDone ? (
+                                            <p className="text-sm text-slate-700 whitespace-pre-wrap">{caseData.workToBeDone}</p>
+                                        ) : (
+                                            <p className="text-sm text-slate-400 italic">No work specified</p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Additional Details Section - Collapsible */}
+                        <div className="border-t border-slate-200 pt-4">
+                            <button
+                                onClick={() => setShowAdditionalDetails(!showAdditionalDetails)}
+                                className="w-full flex items-center justify-between text-left mb-3 hover:text-amber-600 transition-colors"
+                            >
+                                <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Additional Details</h2>
+                                {showAdditionalDetails ? (
+                                    <FaChevronUp className="text-slate-600" />
+                                ) : (
+                                    <FaChevronDown className="text-slate-600" />
+                                )}
+                            </button>
+
+                            {showAdditionalDetails && (
+                                <div className="space-y-4">
+                                    {/* Case Information */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                                        {caseData.caseType && (
+                                            <div className="flex items-center gap-2 text-slate-700">
+                                                <FaTag className="text-amber-600 shrink-0" />
+                                                <div>
+                                                    <span className="font-semibold">Case Type:</span> {caseData.caseType}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {caseData.caseCategory && (
+                                            <div className="flex items-center gap-2 text-slate-700">
+                                                <FaTag className="text-amber-600 shrink-0" />
+                                                <div>
+                                                    <span className="font-semibold">Category:</span> {caseData.caseCategory}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {caseData.currentStage && (
+                                            <div className="flex items-center gap-2 text-slate-700">
+                                                <FaFileAlt className="text-amber-600 shrink-0" />
+                                                <div>
+                                                    <span className="font-semibold">Current Stage:</span> {caseData.currentStage}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {caseData.filingDate && (
+                                            <div className="flex items-center gap-2 text-slate-700">
+                                                <FaCalendarAlt className="text-amber-600 shrink-0" />
+                                                <div>
+                                                    <span className="font-semibold">Filing Date:</span> {new Date(caseData.filingDate).toLocaleDateString()}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Parties Information */}
+                                    {(caseData.defendant || caseData.respondent || caseData.accused) && (
+                                        <div className="pt-3 border-t border-slate-200">
+                                            <h3 className="text-sm font-semibold text-slate-800 mb-2">Parties</h3>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                                                {caseData.defendant && (
+                                                    <div className="flex items-center gap-2 text-slate-700">
+                                                        <FaUser className="text-amber-600 shrink-0" />
+                                                        <div>
+                                                            <span className="font-semibold">Defendant:</span> {caseData.defendant}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {caseData.respondent && (
+                                                    <div className="flex items-center gap-2 text-slate-700">
+                                                        <FaUser className="text-amber-600 shrink-0" />
+                                                        <div>
+                                                            <span className="font-semibold">Respondent:</span> {caseData.respondent}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {caseData.accused && (
+                                                    <div className="flex items-center gap-2 text-slate-700">
+                                                        <FaUser className="text-amber-600 shrink-0" />
+                                                        <div>
+                                                            <span className="font-semibold">Accused:</span> {caseData.accused}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Advocate Information */}
+                                    {(caseData.advocateForPetitioner || caseData.advocateForRespondent || caseData.publicProsecutor) && (
+                                        <div className="pt-3 border-t border-slate-200">
+                                            <h3 className="text-sm font-semibold text-slate-800 mb-2">Advocate Details</h3>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                                                {caseData.advocateForPetitioner && (
+                                                    <div className="flex items-center gap-2 text-slate-700">
+                                                        <FaUser className="text-amber-600 shrink-0" />
+                                                        <div>
+                                                            <span className="font-semibold">Advocate for Petitioner:</span> {caseData.advocateForPetitioner}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {caseData.advocateForRespondent && (
+                                                    <div className="flex items-center gap-2 text-slate-700">
+                                                        <FaUser className="text-amber-600 shrink-0" />
+                                                        <div>
+                                                            <span className="font-semibold">Advocate for Respondent:</span> {caseData.advocateForRespondent}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {caseData.publicProsecutor && (
+                                                    <div className="flex items-center gap-2 text-slate-700">
+                                                        <FaUser className="text-amber-600 shrink-0" />
+                                                        <div>
+                                                            <span className="font-semibold">Public Prosecutor:</span> {caseData.publicProsecutor}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Hearing Information */}
+                                    {(caseData.lastHearingDate || caseData.nextHearingDate || caseData.hearingPurpose || caseData.purposeOfHearingStage) && (
+                                        <div className="pt-3 border-t border-slate-200">
+                                            <h3 className="text-sm font-semibold text-slate-800 mb-2">Hearing Information</h3>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                                                {caseData.lastHearingDate && (
+                                                    <div className="flex items-center gap-2 text-slate-700">
+                                                        <FaCalendarAlt className="text-amber-600 shrink-0" />
+                                                        <div>
+                                                            <span className="font-semibold">Last Hearing:</span> {new Date(caseData.lastHearingDate).toLocaleDateString()}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {caseData.nextHearingDate && (
+                                                    <div className="flex items-center gap-2 text-slate-700">
+                                                        <FaCalendarAlt className="text-amber-600 shrink-0" />
+                                                        <div>
+                                                            <span className="font-semibold">Next Hearing:</span> {new Date(caseData.nextHearingDate).toLocaleDateString()}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {caseData.hearingPurpose && (
+                                                    <div className="flex items-start gap-2 text-slate-700 md:col-span-2">
+                                                        <FaCalendarAlt className="text-amber-600 mt-0.5 shrink-0" />
+                                                        <div>
+                                                            <span className="font-semibold">Hearing Purpose:</span>
+                                                            <p className="text-slate-600 mt-1 whitespace-pre-wrap">{caseData.hearingPurpose}</p>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {caseData.purposeOfHearingStage && (
+                                                    <div className="flex items-start gap-2 text-amber-700 md:col-span-2">
+                                                        <FaCalendarAlt className="mt-0.5 shrink-0" />
+                                                        <div>
+                                                            <span className="font-semibold text-xs sm:text-sm">Purpose of Hearing - Stage (Date)</span>
+                                                            <p className="text-xs sm:text-sm text-amber-800 mt-1 whitespace-pre-wrap">{caseData.purposeOfHearingStage}</p>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Description Section */}
+                                    {(caseData.plaintiffCase || caseData.description || caseData.defendantCase) && (
+                                        <div className="pt-3 border-t border-slate-200">
+                                            <h3 className="text-sm font-semibold text-slate-800 mb-2">Description</h3>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                                                {(caseData.plaintiffCase || caseData.description) && (
+                                                    <div>
+                                                        <h4 className="font-semibold text-slate-700 mb-1">Plaintiff Case</h4>
+                                                        <p className="text-slate-600 whitespace-pre-wrap">
+                                                            {caseData.plaintiffCase || caseData.description}
+                                                        </p>
+                                                    </div>
+                                                )}
+                                                {caseData.defendantCase && (
+                                                    <div>
+                                                        <h4 className="font-semibold text-slate-700 mb-1">Defendant/Opponent Case</h4>
+                                                        <p className="text-slate-600 whitespace-pre-wrap">
+                                                            {caseData.defendantCase}
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Notes */}
+                                    {caseData.notes && (
+                                        <div className="pt-3 border-t border-slate-200">
+                                            <div className="text-sm">
+                                                <span className="font-semibold text-slate-700">Notes / Remarks:</span>
+                                                <p className="text-slate-600 mt-1 whitespace-pre-wrap">{caseData.notes}</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
                     <div className="mb-4 bg-white rounded-lg shadow-sm border-b border-slate-200 overflow-x-auto">

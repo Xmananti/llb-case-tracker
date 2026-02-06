@@ -45,6 +45,8 @@ export async function createCase({
   caseNumber,
   caseCategory,
   court,
+  fileNumber,
+  year,
   courtComplex,
   benchJudgeName,
   plaintiff,
@@ -57,6 +59,7 @@ export async function createCase({
   advocateForRespondent,
   publicProsecutor,
   seniorCounsel,
+  mobileNumber,
   vakalatFiled,
   currentStage,
   lastHearingDate,
@@ -77,6 +80,8 @@ export async function createCase({
   caseNumber?: string;
   caseCategory?: string;
   court?: string;
+  fileNumber?: string;
+  year?: string;
   courtComplex?: string;
   benchJudgeName?: string;
   plaintiff?: string;
@@ -89,6 +94,7 @@ export async function createCase({
   advocateForRespondent?: string;
   publicProsecutor?: string;
   seniorCounsel?: string;
+  mobileNumber?: string;
   vakalatFiled?: boolean;
   currentStage?: string;
   lastHearingDate?: string;
@@ -122,6 +128,8 @@ export async function createCase({
       caseNumber,
       caseCategory,
       court,
+      fileNumber,
+      year,
       courtComplex,
       benchJudgeName,
       plaintiff,
@@ -134,6 +142,7 @@ export async function createCase({
       advocateForRespondent,
       publicProsecutor,
       seniorCounsel,
+      mobileNumber,
       vakalatFiled,
       currentStage,
       lastHearingDate,
@@ -179,6 +188,8 @@ export async function updateCase({
   caseNumber,
   caseCategory,
   court,
+  fileNumber,
+  year,
   courtComplex,
   benchJudgeName,
   plaintiff,
@@ -191,6 +202,7 @@ export async function updateCase({
   advocateForRespondent,
   publicProsecutor,
   seniorCounsel,
+  mobileNumber,
   vakalatFiled,
   currentStage,
   lastHearingDate,
@@ -212,6 +224,8 @@ export async function updateCase({
   caseNumber?: string;
   caseCategory?: string;
   court?: string;
+  fileNumber?: string;
+  year?: string;
   courtComplex?: string;
   benchJudgeName?: string;
   plaintiff?: string;
@@ -224,6 +238,7 @@ export async function updateCase({
   advocateForRespondent?: string;
   publicProsecutor?: string;
   seniorCounsel?: string;
+  mobileNumber?: string;
   vakalatFiled?: boolean;
   currentStage?: string;
   lastHearingDate?: string;
@@ -258,6 +273,8 @@ export async function updateCase({
       caseNumber,
       caseCategory,
       court,
+      fileNumber,
+      year,
       courtComplex,
       benchJudgeName,
       plaintiff,
@@ -270,6 +287,7 @@ export async function updateCase({
       advocateForRespondent,
       publicProsecutor,
       seniorCounsel,
+      mobileNumber,
       vakalatFiled,
       currentStage,
       lastHearingDate,
