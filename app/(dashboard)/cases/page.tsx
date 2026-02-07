@@ -758,31 +758,6 @@ const CasesPage: React.FC = () => {
                     >
                         <FaFileAlt /> Add New Case
                     </button>
-                    <button
-                        className="bg-amber-600 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-amber-700 transition-all shadow-md hover:shadow-lg font-semibold flex items-center justify-center gap-2 text-xs sm:text-sm"
-                        onClick={async () => {
-                            if (!user) return;
-                            try {
-                                const res = await fetch("/api/cases/seed", {
-                                    method: "POST",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({ userId: user.uid }),
-                                });
-                                if (res.ok) {
-                                    await res.json();
-                                    const res2 = await getCases(user.uid);
-                                    setCases(res2);
-                                    alert("Sample case created successfully!");
-                                } else {
-                                    setError("Failed to create sample case");
-                                }
-                            } catch {
-                                setError("Failed to create sample case");
-                            }
-                        }}
-                    >
-                        <FaFileAlt /> Create Sample Case
-                    </button>
                 </div>
             </div>
             {loading ? (
