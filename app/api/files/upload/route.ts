@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { put } from "@vercel/blob";
+import { uploadToGcs } from "@/lib/gcs";
 
 // Use Node.js runtime for larger file uploads (Edge runtime has 4.5MB limit)
 export const runtime = "nodejs";
@@ -9,8 +9,6 @@ export const maxDuration = 60;
 // CORS headers helper
 function getCorsHeaders(request: NextRequest) {
   const origin = request.headers.get("origin");
-  // Allow requests from same origin or configured origins
-  // In production, you may want to restrict this to specific domains
   const allowedOrigin = origin || process.env.ALLOWED_ORIGIN || "*";
 
   return {
@@ -32,13 +30,11 @@ export async function POST(request: NextRequest) {
   const corsHeaders = getCorsHeaders(request);
 
   try {
-    // Check for Blob token
-    const token = process.env.BLOB_READ_WRITE_TOKEN;
-    if (!token) {
+    if (!process.env.GCS_BUCKET) {
       return NextResponse.json(
         {
           error:
-            "BLOB_READ_WRITE_TOKEN is not set. Please configure Vercel Blob Storage.",
+            "GCS_BUCKET is not set. Please configure Google Cloud Storage.",
         },
         { status: 500, headers: corsHeaders }
       );
@@ -62,7 +58,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check file size (Vercel Blob free tier: 100MB max per file, Pro: 500MB)
     const maxFileSize = 100 * 1024 * 1024; // 100MB
     if (file.size > maxFileSize) {
       return NextResponse.json(
@@ -75,19 +70,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Upload to Vercel Blob Storage
-    // Note: For files > 4MB, consider using direct client-side uploads
-    // to bypass Next.js body size limits
-    const blob = await put(path, file, {
-      access: "public",
-      addRandomSuffix: false,
-      token, // Use the token from environment variable
-    });
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    const { url, path: storedPath } = await uploadToGcs(
+      path,
+      buffer,
+      file.type || undefined
+    );
 
     return NextResponse.json(
       {
-        url: blob.url,
-        path: blob.pathname,
+        url,
+        path: storedPath,
         size: file.size,
       },
       { headers: corsHeaders }
@@ -98,7 +93,6 @@ export async function POST(request: NextRequest) {
 
     if (error instanceof Error) {
       errorMessage = error.message;
-      // Provide more helpful error messages
       if (
         error.message.includes("413") ||
         error.message.includes("Payload Too Large") ||
@@ -119,9 +113,9 @@ export async function POST(request: NextRequest) {
       ) {
         errorMessage =
           "CORS error: File upload failed due to cross-origin restrictions. Please ensure your domain is properly configured.";
-      } else if (error.message.includes("BLOB_READ_WRITE_TOKEN")) {
+      } else if (error.message.includes("GCS_BUCKET") || error.message.includes("GCS_")) {
         errorMessage =
-          "Server configuration error: Blob storage token is missing or invalid.";
+          "Server configuration error: Google Cloud Storage is not configured.";
       }
     }
 

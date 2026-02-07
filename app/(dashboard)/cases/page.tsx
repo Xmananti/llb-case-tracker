@@ -400,7 +400,7 @@ const CasesPage: React.FC = () => {
                     const file = selectedFiles[i];
                     const fileKey = editId ? `edit_${i}` : `new_${i}`;
                     try {
-                        // Upload to Vercel Blob Storage with progress tracking
+                        // Upload to GCS via API with progress tracking
                         const { url, path } = await uploadCaseDocument(caseIdForUpload, file, (progress) => {
                             const percent = (progress.loaded / progress.total) * 100;
                             setUploadProgress(prev => ({ ...prev, [fileKey]: percent }));
@@ -834,7 +834,6 @@ const CasesPage: React.FC = () => {
                                 <table className="w-full">
                                     <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
                                         <tr>
-                                            <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Title</th>
                                             <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Case Number</th>
                                             <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Status</th>
                                             <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Court</th>
@@ -854,13 +853,8 @@ const CasesPage: React.FC = () => {
                                                         href={`/cases/${c.id}`}
                                                         className="text-sm font-semibold text-slate-900 hover:text-amber-600 transition"
                                                     >
-                                                        {c.title}
-                                                    </Link>
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <span className="text-sm text-slate-600">
                                                         {c.caseNumber || "—"}
-                                                    </span>
+                                                    </Link>
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     {c.status && (

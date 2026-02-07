@@ -560,7 +560,7 @@ const CaseDocumentsTab: React.FC<{ caseId: string }> = ({ caseId }) => {
         setUploading(true);
         setError("");
         try {
-            // Upload to Vercel Blob Storage
+            // Upload to GCS via API
             const { url, path } = await uploadCaseDocument(caseId, file);
 
             const fileType = file.type || "";
@@ -618,7 +618,7 @@ const CaseDocumentsTab: React.FC<{ caseId: string }> = ({ caseId }) => {
 
         try {
             setError("");
-            // Delete from Vercel Blob Storage first
+            // Delete from GCS first
             try {
                 await deleteFile(fileUrl);
             } catch (storageError) {

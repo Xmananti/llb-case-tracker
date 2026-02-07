@@ -1,6 +1,5 @@
 /**
- * Storage module - Now uses Vercel Blob Storage instead of Firebase Storage
- * This provides free file storage without Firebase Storage costs
+ * Storage module - Uses Google Cloud Storage (GCS) via API routes
  */
 
 import {

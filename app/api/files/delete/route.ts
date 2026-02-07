@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { del } from "@vercel/blob";
+import { deleteFromGcsByUrl, parseGcsUrl } from "@/lib/gcs";
 
 export async function DELETE(request: NextRequest) {
   try {
-    // Check for Blob token
-    const token = process.env.BLOB_READ_WRITE_TOKEN;
-    if (!token) {
+    if (!process.env.GCS_BUCKET) {
       return NextResponse.json(
         {
           error:
-            "BLOB_READ_WRITE_TOKEN is not set. Please configure Vercel Blob Storage.",
+            "GCS_BUCKET is not set. Please configure Google Cloud Storage.",
         },
         { status: 500 }
       );
@@ -22,8 +20,15 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "No URL provided" }, { status: 400 });
     }
 
-    // Delete from Vercel Blob Storage
-    await del(url, { token });
+    const parsed = parseGcsUrl(url);
+    if (!parsed) {
+      return NextResponse.json(
+        { error: "Invalid or unsupported storage URL. Only GCS URLs can be deleted." },
+        { status: 400 }
+      );
+    }
+
+    await deleteFromGcsByUrl(url);
 
     return NextResponse.json({ success: true });
   } catch (error) {

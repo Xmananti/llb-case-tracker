@@ -163,7 +163,28 @@ const DashboardHome: React.FC = () => {
             <div className="flex-1 flex flex-col overflow-hidden">
                 <div className="flex-1 overflow-y-auto px-4 py-6 sm:py-8">
                     <div className="max-w-7xl mx-auto">
-                    {/* Header with View Toggle */}
+
+                    {/* Empty State: no cases at all — prompt to create new case */}
+                    {!loading && cases.length === 0 && !error && (
+                        <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
+                            <div className="bg-slate-100 rounded-full p-6 mb-6">
+                                <FaFileAlt className="text-5xl sm:text-6xl text-slate-400" />
+                            </div>
+                            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-2">No cases yet</h2>
+                            <p className="text-slate-600 text-sm sm:text-base max-w-md mb-8">
+                                Get started by creating your first case. You can add court details, parties, documents, and track hearings.
+                            </p>
+                            <Link
+                                href="/cases?new=true"
+                                className="inline-flex items-center gap-2 bg-amber-600 text-white font-semibold px-6 py-3 rounded-lg hover:bg-amber-700 transition shadow-md"
+                            >
+                                <FaPlus /> Create New Case
+                            </Link>
+                        </div>
+                    )}
+
+                    {/* Header with View Toggle — only when there are cases */}
+                    {cases.length > 0 && (
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
                         <div>
                             <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 flex items-center gap-2">
@@ -202,9 +223,10 @@ const DashboardHome: React.FC = () => {
                             </div>
                         </div>
                     </div>
+                    )}
 
-                    {/* Search Bar (only for table view) */}
-                    {viewType === "table" && (
+                    {/* Search Bar (only for table view when there are cases) */}
+                    {cases.length > 0 && viewType === "table" && (
                         <div className="mb-6">
                             <div className="relative max-w-md">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -231,7 +253,7 @@ const DashboardHome: React.FC = () => {
                     )}
 
                     {/* Table View */}
-                    {viewType === "table" && !loading && (
+                    {cases.length > 0 && viewType === "table" && !loading && (
                         <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
                             {filteredCases.length === 0 ? (
                                 <div className="p-12 text-center">
@@ -246,7 +268,6 @@ const DashboardHome: React.FC = () => {
                                         <table className="w-full">
                                             <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
                                                 <tr>
-                                                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Title</th>
                                                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Case Number</th>
                                                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Status</th>
                                                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Court</th>
@@ -263,13 +284,8 @@ const DashboardHome: React.FC = () => {
                                                                 href={`/cases/${c.id}`}
                                                                 className="text-sm font-semibold text-slate-900 hover:text-amber-600 transition"
                                                             >
-                                                                {c.title}
-                                                            </Link>
-                                                        </td>
-                                                        <td className="px-4 py-3">
-                                                            <span className="text-sm text-slate-600">
                                                                 {c.caseNumber || "—"}
-                                                            </span>
+                                                            </Link>
                                                         </td>
                                                         <td className="px-4 py-3">
                                                             {c.status && (
@@ -331,7 +347,7 @@ const DashboardHome: React.FC = () => {
                     )}
 
                     {/* Grid View */}
-                    {viewType === "grid" && !loading && (
+                    {cases.length > 0 && viewType === "grid" && !loading && (
                         <>
                             {filteredCases.length === 0 ? (
                                 <div className="bg-white rounded-lg border border-slate-200 p-12 text-center">
@@ -351,7 +367,7 @@ const DashboardHome: React.FC = () => {
                                             >
                                                 <div className="flex items-start justify-between mb-2">
                                                     <h4 className="text-sm font-semibold text-slate-900 group-hover:text-amber-600 transition line-clamp-2 flex-1">
-                                                        {c.title}
+                                                        {c.caseNumber ? `#${c.caseNumber}` : c.court || "Case"}
                                                     </h4>
                                                     {c.status && (
                                                         <span
@@ -398,21 +414,6 @@ const DashboardHome: React.FC = () => {
                                 </>
                             )}
                         </>
-                    )}
-
-                    {/* Empty State */}
-                    {!loading && cases.length === 0 && !error && (
-                        <div className="mt-8 sm:mt-12 text-center">
-                            <FaFileAlt className="text-4xl sm:text-5xl text-slate-400 mx-auto mb-4" />
-                            <h3 className="text-lg sm:text-xl font-semibold text-slate-900 mb-2">No cases yet</h3>
-                            <p className="text-slate-600 text-sm sm:text-base mb-4">Create your first case to get started</p>
-                            <Link
-                                href="/cases?new=true"
-                                className="inline-flex items-center gap-2 bg-amber-600 text-white font-semibold px-4 sm:px-6 py-2 sm:py-3 rounded-lg hover:bg-amber-700 transition shadow-md"
-                            >
-                                <FaPlus /> Create Your First Case
-                            </Link>
-                        </div>
                     )}
 
                     {/* Error State */}
