@@ -4,8 +4,9 @@ import { useAuth } from "../../../context/AuthContext";
 import { getCases, createCase, updateCase, deleteCase } from "../../../lib/api-client";
 import { createClient, getClients } from "../../../lib/api-client";
 import { uploadCaseDocument } from "../../../lib/firebase/storage";
-import { FaGavel, FaFileAlt, FaCalendarAlt, FaUser, FaBuilding, FaHashtag, FaCheckCircle, FaClock, FaPauseCircle, FaUpload, FaTimes, FaComments, FaTasks, FaSearch, FaTrash, FaArrowLeft } from "react-icons/fa";
+import { FaFileAlt, FaCheckCircle, FaTimes, FaSearch, FaEdit, FaTrash } from "react-icons/fa";
 import Link from "next/link";
+import CaseModal, { CaseFormData } from "../../../components/CaseModal";
 import { useSearchParams } from "next/navigation";
 
 interface Case {
@@ -18,6 +19,8 @@ interface Case {
     caseNumber?: string;
     caseCategory?: string;
     court?: string;
+    fileNumber?: string;
+    year?: string;
     plaintiff?: string;
     defendant?: string;
     petitioner?: string;
@@ -28,6 +31,7 @@ interface Case {
     advocateForRespondent?: string;
     publicProsecutor?: string;
     currentStage?: string;
+    mobileNumber?: string;
     lastHearingDate?: string;
     nextHearingDate?: string;
     hearingPurpose?: string;
@@ -36,6 +40,8 @@ interface Case {
     caseType?: string;
     status?: "pending" | "admitted" | "dismissed" | "allowed" | "disposed" | "withdrawn" | "compromised" | "stayed" | "appeal_filed";
     filingDate?: string;
+    updatedAt?: string;
+    createdAt?: string;
 }
 
 const CasesPage: React.FC = () => {
@@ -48,34 +54,7 @@ const CasesPage: React.FC = () => {
     const [error, setError] = useState("");
     const [showModal, setShowModal] = useState(false);
     const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery);
-    const [form, setForm] = useState<{
-        title: string;
-        description: string;
-        plaintiffCase: string;
-        defendantCase: string;
-        workToBeDone: string;
-        caseNumber: string;
-        caseCategory: string;
-        court: string;
-        plaintiff: string;
-        defendant: string;
-        petitioner: string;
-        respondent: string;
-        complainant: string;
-        accused: string;
-        advocateForPetitioner: string;
-        advocateForRespondent: string;
-        publicProsecutor: string;
-        currentStage: string;
-        lastHearingDate: string;
-        nextHearingDate: string;
-        hearingPurpose: string;
-        purposeOfHearingStage: string;
-        notes: string;
-        caseType: string;
-        status: "pending" | "admitted" | "dismissed" | "allowed" | "disposed" | "withdrawn" | "compromised" | "stayed" | "appeal_filed";
-        filingDate: string;
-    }>({
+    const [form, setForm] = useState<CaseFormData>({
         title: "",
         description: "",
         plaintiffCase: "",
@@ -84,6 +63,8 @@ const CasesPage: React.FC = () => {
         caseNumber: "",
         caseCategory: "",
         court: "",
+        fileNumber: "",
+        year: "",
         plaintiff: "",
         defendant: "",
         petitioner: "",
@@ -93,6 +74,7 @@ const CasesPage: React.FC = () => {
         advocateForPetitioner: "",
         advocateForRespondent: "",
         publicProsecutor: "",
+        mobileNumber: "",
         currentStage: "",
         lastHearingDate: "",
         nextHearingDate: "",
@@ -105,13 +87,13 @@ const CasesPage: React.FC = () => {
     });
     const [editId, setEditId] = useState<string | null>(null);
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+    const [selectedPlaintiffFiles, setSelectedPlaintiffFiles] = useState<File[]>([]);
     const [selectedCitationFiles, setSelectedCitationFiles] = useState<File[]>([]);
     const [uploading, setUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
     const [caseStats, setCaseStats] = useState<{ [caseId: string]: { documents: number; hearings: number; tasks: number; conversations: number } }>({});
     const [deletingCaseId, setDeletingCaseId] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string>("");
-    const [isSearchExpanded, setIsSearchExpanded] = useState(false);
 
     // Fetch cases for current user
     useEffect(() => {
@@ -205,8 +187,6 @@ const CasesPage: React.FC = () => {
     useEffect(() => {
         if (searchParams?.get("search")) {
             setLocalSearchQuery(searchParams.get("search") || "");
-            // Auto-expand search on desktop if there's a search query
-            setIsSearchExpanded(true);
         } else {
             setLocalSearchQuery("");
         }
@@ -226,6 +206,8 @@ const CasesPage: React.FC = () => {
                 caseNumber: "",
                 caseCategory: "",
                 court: "",
+                fileNumber: "",
+                year: "",
                 plaintiff: "",
                 defendant: "",
                 petitioner: "",
@@ -235,6 +217,7 @@ const CasesPage: React.FC = () => {
                 advocateForPetitioner: "",
                 advocateForRespondent: "",
                 publicProsecutor: "",
+                mobileNumber: "",
                 currentStage: "",
                 lastHearingDate: "",
                 nextHearingDate: "",
@@ -246,6 +229,7 @@ const CasesPage: React.FC = () => {
                 filingDate: "",
             });
             setSelectedFiles([]);
+            setSelectedPlaintiffFiles([]);
             setShowModal(true);
             // Remove the query parameter from URL without reload
             const url = new URL(window.location.href);
@@ -269,26 +253,26 @@ const CasesPage: React.FC = () => {
         }
     }, [searchParams, user, cases]);
 
-    // Filter cases based on local search query
+    // Filter cases based on search query from URL (only when URL param changes)
     useEffect(() => {
-        if (localSearchQuery.trim()) {
+        if (searchQuery.trim()) {
             const filtered = cases.filter((c: Case) =>
-                c.title.toLowerCase().includes(localSearchQuery.toLowerCase()) ||
-                c.description?.toLowerCase().includes(localSearchQuery.toLowerCase()) ||
-                c.caseNumber?.toLowerCase().includes(localSearchQuery.toLowerCase()) ||
-                c.court?.toLowerCase().includes(localSearchQuery.toLowerCase()) ||
-                c.plaintiff?.toLowerCase().includes(localSearchQuery.toLowerCase()) ||
-                c.defendant?.toLowerCase().includes(localSearchQuery.toLowerCase()) ||
-                c.petitioner?.toLowerCase().includes(localSearchQuery.toLowerCase()) ||
-                c.respondent?.toLowerCase().includes(localSearchQuery.toLowerCase()) ||
-                c.complainant?.toLowerCase().includes(localSearchQuery.toLowerCase()) ||
-                c.accused?.toLowerCase().includes(localSearchQuery.toLowerCase())
+                c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                c.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                c.caseNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                c.court?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                c.plaintiff?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                c.defendant?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                c.petitioner?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                c.respondent?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                c.complainant?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                c.accused?.toLowerCase().includes(searchQuery.toLowerCase())
             );
             setFilteredCases(filtered);
         } else {
             setFilteredCases(cases);
         }
-    }, [localSearchQuery, cases]);
+    }, [searchQuery, cases]);
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
@@ -296,10 +280,12 @@ const CasesPage: React.FC = () => {
         if (localSearchQuery.trim()) {
             params.set("search", localSearchQuery.trim());
             window.history.pushState({}, "", `/cases?${params.toString()}`);
-            // Keep search expanded on desktop when there's a query
-            setIsSearchExpanded(true);
+            // Trigger search by updating the searchQuery from URL
+            // This will trigger the useEffect that filters cases
         } else {
             window.history.pushState({}, "", "/cases");
+            // Clear filtered cases to show all
+            setFilteredCases(cases);
         }
     };
 
@@ -344,15 +330,68 @@ const CasesPage: React.FC = () => {
                 status: form.status && validStatuses.includes(form.status) ? form.status : "pending"
             };
 
+            let caseIdForUpload: string | undefined;
             if (editId) {
                 await updateCase({ id: editId, ...caseData });
+                caseIdForUpload = editId;
             } else {
                 const result = await createCase(caseData);
                 newCaseId = result.id;
+                caseIdForUpload = newCaseId;
+            }
+
+            // Upload plaintiff/petitioner documents if any were selected
+            if (selectedPlaintiffFiles.length > 0 && caseIdForUpload) {
+                const { getFirestore, collection, addDoc, Timestamp } = await import("firebase/firestore");
+                const { app } = await import("../../../lib/firebase/config");
+                const db = getFirestore(app);
+
+                for (let i = 0; i < selectedPlaintiffFiles.length; i++) {
+                    const file = selectedPlaintiffFiles[i];
+                    const fileKey = editId ? `plaintiff_edit_${i}` : `plaintiff_new_${i}`;
+                    try {
+                        const { url, path } = await uploadCaseDocument(caseIdForUpload, file, (progress) => {
+                            const percent = (progress.loaded / progress.total) * 100;
+                            setUploadProgress(prev => ({ ...prev, [fileKey]: percent }));
+                        });
+
+                        const fileType = file.type || "";
+                        const isImage = fileType.startsWith("image/");
+                        const isPDF = fileType === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+
+                        await addDoc(collection(db, "documents"), {
+                            caseId: caseIdForUpload,
+                            name: file.name,
+                            url: url,
+                            uploadedBy: user.uid,
+                            uploadedAt: Timestamp.now(),
+                            path: path,
+                            type: fileType || "unknown",
+                            size: file.size,
+                            isImage,
+                            isPDF,
+                            category: "plaintiff",
+                        });
+
+                        setUploadProgress(prev => {
+                            const newProgress = { ...prev };
+                            delete newProgress[fileKey];
+                            return newProgress;
+                        });
+                    } catch (uploadError) {
+                        console.error("Error uploading plaintiff file:", uploadError);
+                        setError(`Failed to upload ${file.name}. Please try uploading it manually in the case details.`);
+                        setUploadProgress(prev => {
+                            const newProgress = { ...prev };
+                            delete newProgress[fileKey];
+                            return newProgress;
+                        });
+                    }
+                }
             }
 
             // Upload documents if any were selected
-            if (selectedFiles.length > 0 && newCaseId) {
+            if (selectedFiles.length > 0 && caseIdForUpload) {
                 const { getFirestore, collection, addDoc, Timestamp } = await import("firebase/firestore");
                 const { app } = await import("../../../lib/firebase/config");
                 const db = getFirestore(app);
@@ -362,7 +401,7 @@ const CasesPage: React.FC = () => {
                     const fileKey = editId ? `edit_${i}` : `new_${i}`;
                     try {
                         // Upload to Vercel Blob Storage with progress tracking
-                        const { url, path } = await uploadCaseDocument(newCaseId, file, (progress) => {
+                        const { url, path } = await uploadCaseDocument(caseIdForUpload, file, (progress) => {
                             const percent = (progress.loaded / progress.total) * 100;
                             setUploadProgress(prev => ({ ...prev, [fileKey]: percent }));
                         });
@@ -373,7 +412,7 @@ const CasesPage: React.FC = () => {
 
                         // Save document metadata to Firestore
                         await addDoc(collection(db, "documents"), {
-                            caseId: newCaseId,
+                            caseId: caseIdForUpload,
                             name: file.name,
                             url: url,
                             uploadedBy: user.uid,
@@ -405,7 +444,7 @@ const CasesPage: React.FC = () => {
             }
 
             // Upload citations if any were selected (store as documents with category=citation)
-            if (selectedCitationFiles.length > 0 && newCaseId) {
+            if (selectedCitationFiles.length > 0 && caseIdForUpload) {
                 const { getFirestore, collection, addDoc, Timestamp } = await import("firebase/firestore");
                 const { app } = await import("../../../lib/firebase/config");
                 const db = getFirestore(app);
@@ -413,13 +452,13 @@ const CasesPage: React.FC = () => {
                 for (let i = 0; i < selectedCitationFiles.length; i++) {
                     const file = selectedCitationFiles[i];
                     try {
-                        const { url, path } = await uploadCaseDocument(newCaseId, file);
+                        const { url, path } = await uploadCaseDocument(caseIdForUpload, file);
                         const fileType = file.type || "";
                         const isImage = fileType.startsWith("image/");
                         const isPDF = fileType === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
 
                         await addDoc(collection(db, "documents"), {
-                            caseId: newCaseId,
+                            caseId: caseIdForUpload,
                             name: file.name,
                             url: url,
                             uploadedBy: user.uid,
@@ -448,6 +487,8 @@ const CasesPage: React.FC = () => {
                 caseNumber: "",
                 caseCategory: "",
                 court: "",
+                fileNumber: "",
+                year: "",
                 plaintiff: "",
                 defendant: "",
                 petitioner: "",
@@ -457,6 +498,7 @@ const CasesPage: React.FC = () => {
                 advocateForPetitioner: "",
                 advocateForRespondent: "",
                 publicProsecutor: "",
+                mobileNumber: "",
                 currentStage: "",
                 lastHearingDate: "",
                 nextHearingDate: "",
@@ -468,6 +510,7 @@ const CasesPage: React.FC = () => {
                 filingDate: "",
             });
             setSelectedFiles([]);
+            setSelectedPlaintiffFiles([]);
             setSelectedCitationFiles([]);
             setUploadProgress({});
             setEditId(null);
@@ -536,6 +579,8 @@ const CasesPage: React.FC = () => {
             caseNumber: c.caseNumber || "",
             caseCategory: c.caseCategory || "",
             court: c.court || "",
+            fileNumber: (c as any).fileNumber || "",
+            year: (c as any).year || "",
             plaintiff: c.plaintiff || "",
             defendant: c.defendant || "",
             petitioner: c.petitioner || "",
@@ -545,6 +590,7 @@ const CasesPage: React.FC = () => {
             advocateForPetitioner: c.advocateForPetitioner || "",
             advocateForRespondent: c.advocateForRespondent || "",
             publicProsecutor: c.publicProsecutor || "",
+            mobileNumber: (c as any).mobileNumber || "",
             currentStage: c.currentStage || "",
             lastHearingDate: c.lastHearingDate || "",
             nextHearingDate: c.nextHearingDate || "",
@@ -620,94 +666,52 @@ const CasesPage: React.FC = () => {
 
     return (
         <div className="max-w-7xl mx-auto">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-                <div className="flex items-center gap-3 flex-1">
-                    <h1 className="text-xl sm:text-2xl font-bold text-slate-900">My Cases</h1>
-                    {/* Desktop: Search Icon Button */}
-                    <div className="hidden md:flex items-center gap-2">
-                        {!isSearchExpanded ? (
-                            <button
-                                type="button"
-                                onClick={() => setIsSearchExpanded(true)}
-                                className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-all"
-                                title="Search cases"
-                            >
-                                <FaSearch className="text-lg" />
-                            </button>
-                        ) : (
-                            <form onSubmit={handleSearch} className="flex items-center gap-2">
-                                <div className="relative">
-                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <FaSearch className="text-slate-400 text-sm" />
+            {/* Search Bar - Always Visible */}
+            <div className="mb-6">
+                <form onSubmit={handleSearch} className="w-full">
+                    <div className="relative max-w-2xl">
+                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                            <FaSearch className="text-slate-400 text-lg" />
                                     </div>
                                     <input
                                         type="text"
                                         value={localSearchQuery}
                                         onChange={(e) => setLocalSearchQuery(e.target.value)}
-                                        placeholder="Search cases..."
-                                        autoFocus
-                                        className="w-64 pl-9 pr-8 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                            placeholder="Search cases by title, case number, court, parties..."
+                            className="w-full pl-12 pr-24 py-3 text-base border-2 border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 shadow-sm hover:border-slate-400 transition-colors"
                                     />
+                        <div className="absolute inset-y-0 right-0 flex items-center gap-2 pr-2">
                                     {localSearchQuery && (
                                         <button
                                             type="button"
                                             onClick={() => {
                                                 setLocalSearchQuery("");
                                                 window.history.pushState({}, "", "/cases");
+                                        setFilteredCases(cases);
                                             }}
-                                            className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+                                    className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition"
+                                    title="Clear search"
                                         >
-                                            <span className="text-lg">×</span>
+                                    <FaTimes className="text-sm" />
                                         </button>
                                     )}
-                                </div>
                                 <button
-                                    type="button"
-                                    onClick={() => {
-                                        setIsSearchExpanded(false);
-                                        if (!localSearchQuery) {
-                                            setLocalSearchQuery("");
-                                            window.history.pushState({}, "", "/cases");
-                                        }
-                                    }}
-                                    className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-all"
-                                    title="Close search"
-                                >
-                                    <FaTimes className="text-sm" />
+                                type="submit"
+                                className="px-4 py-2 bg-amber-600 text-white font-semibold rounded-lg hover:bg-amber-700 transition-all shadow-sm hover:shadow-md"
+                            >
+                                Search
                                 </button>
-                            </form>
-                        )}
+                        </div>
                     </div>
+                            </form>
+                    </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                <div className="flex items-center gap-3 flex-1">
+                    <h1 className="text-xl sm:text-2xl font-bold text-slate-900">My Cases</h1>
                     <p className="text-slate-600 text-xs sm:text-sm mt-0.5 hidden sm:block">Manage your legal cases and documents</p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                    {/* Mobile: Search Bar */}
-                    <form onSubmit={handleSearch} className="flex-1 md:hidden">
-                        <div className="relative">
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <FaSearch className="text-slate-400 text-sm" />
-                            </div>
-                            <input
-                                type="text"
-                                value={localSearchQuery}
-                                onChange={(e) => setLocalSearchQuery(e.target.value)}
-                                placeholder="Search cases..."
-                                className="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                            />
-                            {localSearchQuery && (
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setLocalSearchQuery("");
-                                        window.history.pushState({}, "", "/cases");
-                                    }}
-                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
-                                >
-                                    <span className="text-lg">×</span>
-                                </button>
-                            )}
-                        </div>
-                    </form>
                     <button
                         className="bg-slate-900 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-slate-800 transition-all shadow-md hover:shadow-lg font-semibold flex items-center justify-center gap-2 text-xs sm:text-sm"
                         onClick={() => {
@@ -721,6 +725,8 @@ const CasesPage: React.FC = () => {
                                 caseNumber: "",
                                 caseCategory: "",
                                 court: "",
+                                fileNumber: "",
+                                year: "",
                                 plaintiff: "",
                                 defendant: "",
                                 petitioner: "",
@@ -730,6 +736,7 @@ const CasesPage: React.FC = () => {
                                 advocateForPetitioner: "",
                                 advocateForRespondent: "",
                                 publicProsecutor: "",
+                                mobileNumber: "",
                                 currentStage: "",
                                 lastHearingDate: "",
                                 nextHearingDate: "",
@@ -741,6 +748,7 @@ const CasesPage: React.FC = () => {
                                 filingDate: "",
                             });
                             setSelectedFiles([]);
+                            setSelectedPlaintiffFiles([]);
                             setSelectedCitationFiles([]);
                             setShowModal(true);
                         }}
@@ -800,14 +808,15 @@ const CasesPage: React.FC = () => {
                         <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm mb-4">{error}</div>
                     )}
 
-                    {filteredCases.length === 0 && localSearchQuery ? (
+                    {filteredCases.length === 0 && searchQuery ? (
                         <div className="text-center py-12 bg-white rounded-lg border-2 border-dashed border-slate-300">
                             <FaSearch className="text-4xl text-slate-400 mx-auto mb-3" />
-                            <p className="text-slate-600 mb-2">No cases found matching "{localSearchQuery}"</p>
+                            <p className="text-slate-600 mb-2">No cases found matching "{searchQuery}"</p>
                             <button
                                 onClick={() => {
                                     setLocalSearchQuery("");
                                     window.history.pushState({}, "", "/cases");
+                                    setFilteredCases(cases);
                                 }}
                                 className="text-amber-600 hover:text-amber-700 font-medium text-sm"
                             >
@@ -820,534 +829,138 @@ const CasesPage: React.FC = () => {
                             <p className="text-slate-600">No cases found. Create your first case!</p>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
-                            {filteredCases.map(c => {
-                                const getStatusIcon = () => {
-                                    switch (c.status) {
-                                        case "admitted":
-                                        case "allowed": return <FaCheckCircle className="text-green-600" />;
-                                        case "dismissed": return <FaTimes className="text-red-600" />;
-                                        case "disposed": return <FaCheckCircle className="text-gray-600" />;
-                                        case "withdrawn": return <FaClock className="text-orange-600" />;
-                                        case "compromised": return <FaCheckCircle className="text-blue-600" />;
-                                        case "stayed": return <FaPauseCircle className="text-yellow-600" />;
-                                        case "appeal_filed": return <FaFileAlt className="text-purple-600" />;
-                                        case "pending": return <FaClock className="text-yellow-600" />;
-                                        default: return <FaClock className="text-slate-600" />;
-                                    }
-                                };
-                                const getStatusColor = () => {
-                                    switch (c.status) {
-                                        case "admitted":
-                                        case "allowed": return "bg-green-100 text-green-800";
-                                        case "dismissed": return "bg-red-100 text-red-800";
-                                        case "disposed": return "bg-gray-100 text-gray-800";
-                                        case "withdrawn": return "bg-orange-100 text-orange-800";
-                                        case "compromised": return "bg-blue-100 text-blue-800";
-                                        case "stayed": return "bg-yellow-100 text-yellow-800";
-                                        case "appeal_filed": return "bg-purple-100 text-purple-800";
-                                        case "pending": return "bg-yellow-100 text-yellow-800";
-                                        default: return "bg-slate-100 text-slate-800";
-                                    }
-                                };
-                                const isDeleting = deletingCaseId === c.id;
-                                return (
-                                    <Link
-                                        key={c.id}
-                                        href={`/cases/${c.id}`}
-                                        className={`legal-card p-4 rounded-lg hover:shadow-lg transition-all group border border-slate-200 block cursor-pointer ${isDeleting ? 'opacity-0 scale-95 -translate-y-2 transition-all duration-300 pointer-events-none' : ''
-                                            }`}
-                                    >
-                                        <div className="flex justify-between items-start mb-2">
-                                            <div className="flex-1 min-w-0">
-                                                <h3 className="text-base font-bold text-slate-900 group-hover:text-slate-700 mb-1 line-clamp-1">{c.title}</h3>
-                                                {c.caseNumber && (
-                                                    <div className="flex items-center gap-1 text-xs text-slate-600">
-                                                        <FaHashtag className="text-xs" /> {c.caseNumber}
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <div className={`px-2 py-0.5 rounded text-xs font-semibold flex items-center gap-1 ml-2 flex-shrink-0 ${getStatusColor()}`}>
-                                                {getStatusIcon()}
-                                                <span className="capitalize hidden sm:inline">{c.status || "pending"}</span>
-                                            </div>
-                                        </div>
-                                        <p className="text-slate-600 text-xs mb-3 line-clamp-2">{c.description}</p>
-
-                                        <div className="space-y-1 mb-3 text-xs text-slate-600">
-                                            {c.court && (
-                                                <div className="flex items-center gap-1.5 truncate">
-                                                    <FaBuilding className="text-amber-600 flex-shrink-0" /> <span className="truncate">{c.court}</span>
-                                                </div>
-                                            )}
-                                            {(c.plaintiff || c.petitioner || c.complainant) && (
-                                                <div className="flex items-center gap-1.5 truncate">
-                                                    <FaUser className="text-amber-600 flex-shrink-0" />
-                                                    <span className="truncate">
-                                                        {c.plaintiff || c.petitioner || c.complainant}
-                                                        {(c.defendant || c.respondent || c.accused) && ` vs ${c.defendant || c.respondent || c.accused}`}
+                        <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+                            <div className="overflow-x-auto">
+                                <table className="w-full">
+                                    <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
+                                        <tr>
+                                            <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Title</th>
+                                            <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Case Number</th>
+                                            <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Status</th>
+                                            <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Court</th>
+                                            <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Work to be Done</th>
+                                            <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Updated</th>
+                                            <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-200">
+                                        {filteredCases.map((c) => (
+                                            <tr 
+                                    key={c.id}
+                                                className={`hover:bg-slate-50 transition-colors ${deletingCaseId === c.id ? "opacity-50" : ""}`}
+                                            >
+                                                <td className="px-4 py-3">
+                                                    <Link
+                                                        href={`/cases/${c.id}`}
+                                                        className="text-sm font-semibold text-slate-900 hover:text-amber-600 transition"
+                                                    >
+                                                        {c.title}
+                                                    </Link>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <span className="text-sm text-slate-600">
+                                                        {c.caseNumber || "—"}
                                                     </span>
-                                                </div>
-                                            )}
-                                            {c.purposeOfHearingStage && (
-                                                <div className="flex items-center gap-1.5">
-                                                    <FaCalendarAlt className="text-amber-600 flex-shrink-0" /> <span>Purpose: {c.purposeOfHearingStage}</span>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Case Statistics */}
-                                        {caseStats[c.id] && (
-                                            <div className="flex items-center gap-3 mb-3 pt-2 border-t border-slate-100 text-xs">
-                                                <div className="flex items-center gap-1 text-slate-600" title="Documents">
-                                                    <FaFileAlt className="text-blue-600" />
-                                                    <span className="font-semibold">{caseStats[c.id].documents}</span>
-                                                </div>
-                                                <div className="flex items-center gap-1 text-slate-600" title="Hearings">
-                                                    <FaCalendarAlt className="text-green-600" />
-                                                    <span className="font-semibold">{caseStats[c.id].hearings}</span>
-                                                </div>
-                                                <div className="flex items-center gap-1 text-slate-600" title="Tasks">
-                                                    <FaTasks className="text-purple-600" />
-                                                    <span className="font-semibold">{caseStats[c.id].tasks}</span>
-                                                </div>
-                                                <div className="flex items-center gap-1 text-slate-600" title="Conversations">
-                                                    <FaComments className="text-amber-600" />
-                                                    <span className="font-semibold">{caseStats[c.id].conversations}</span>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        <div className="flex gap-1 sm:gap-1.5 pt-3 border-t border-slate-200" onClick={(e) => e.stopPropagation()}>
-                                            <button
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    e.stopPropagation();
-                                                    window.location.href = `/cases/${c.id}`;
-                                                }}
-                                                className="flex-1 bg-slate-900 text-white rounded px-2 py-1.5 hover:bg-slate-800 transition font-medium text-xs text-center flex items-center justify-center gap-1 select-none"
-                                            >
-                                                <FaGavel className="text-xs" /> <span className="hidden sm:inline">View</span>
-                                            </button>
-                                            <button
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    e.stopPropagation();
-                                                    handleEdit(c);
-                                                }}
-                                                disabled={isDeleting}
-                                                className="flex-1 bg-amber-600 text-white rounded px-2 py-1.5 hover:bg-amber-700 transition font-medium text-xs disabled:opacity-50 disabled:cursor-not-allowed select-none"
-                                                onMouseDown={(e) => e.preventDefault()}
-                                            >
-                                                Edit
-                                            </button>
-                                            <button
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    e.stopPropagation();
-                                                    handleDelete(c.id);
-                                                }}
-                                                disabled={isDeleting || deletingCaseId !== null}
-                                                className="flex-1 bg-red-600 text-white rounded px-2 py-1.5 hover:bg-red-700 transition font-medium text-xs flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed select-none"
-                                                onMouseDown={(e) => e.preventDefault()}
-                                            >
-                                                {isDeleting ? (
-                                                    <>
-                                                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                                                        <span className="hidden sm:inline">Deleting...</span>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <FaTrash className="text-xs" />
-                                                        <span className="hidden sm:inline">Del</span>
-                                                    </>
-                                                )}
-                                            </button>
-                                        </div>
-                                    </Link>
-                                );
-                            })}
-                        </div>
-                    )}
-                </>
-            )}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    {c.status && (
+                                                        <span
+                                                            className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                                                c.status === "pending"
+                                                                    ? "bg-yellow-100 text-yellow-800"
+                                                                    : c.status === "admitted" || c.status === "allowed"
+                                                                    ? "bg-green-100 text-green-800"
+                                                                    : c.status === "dismissed" || c.status === "disposed" || c.status === "withdrawn"
+                                                                    ? "bg-gray-100 text-gray-800"
+                                                                    : "bg-orange-100 text-orange-800"
+                                                            }`}
+                                                        >
+                                                            {c.status}
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <span className="text-sm text-slate-600">
+                                                        {c.court || "—"}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <p className="text-sm text-slate-600 line-clamp-2 max-w-xs">
+                                                        {c.workToBeDone || "—"}
+                                                    </p>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <span className="text-xs text-slate-500">
+                                                        {c.updatedAt
+                                                            ? new Date(c.updatedAt).toLocaleDateString()
+                                                            : c.createdAt
+                                                            ? new Date(c.createdAt).toLocaleDateString()
+                                                            : "—"}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <div className="flex items-center gap-2">
+                                                                <button
+                                                            onClick={() => handleEdit(c)}
+                                                            className="p-1.5 text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded transition"
+                                                            title="Edit case"
+                                                        >
+                                                            <FaEdit className="text-sm" />
+                                                                </button>
+                                                            <button
+                                                            onClick={() => handleDelete(c.id)}
+                                                            disabled={deletingCaseId === c.id}
+                                                            className="p-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                                            title="Delete case"
+                                                        >
+                                                            <FaTrash className="text-sm" />
+                                                            </button>
+                                                        <Link
+                                                            href={`/cases/${c.id}`}
+                                                            className="text-xs text-amber-600 hover:text-amber-700 font-medium ml-1"
+                                                        >
+                                                            View →
+                                                        </Link>
+                                                        </div>
+                                                </td>
+                                            </tr>
+                                                    ))}
+                                    </tbody>
+                                </table>
+                                    </div>
+                                </div>
+                            )}
+                                    </>
+                                )}
 
             {/* Modal */}
             {showModal && (
-                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-2 sm:p-4 overflow-y-auto">
-                    <form
+                <CaseModal
+                    form={form}
+                    setForm={setForm}
+                    editId={editId}
+                    uploading={uploading}
+                    selectedFiles={selectedFiles}
+                    setSelectedFiles={setSelectedFiles}
+                    selectedCitationFiles={selectedCitationFiles}
+                    setSelectedCitationFiles={setSelectedCitationFiles}
+                    uploadProgress={uploadProgress}
+                    setUploadProgress={setUploadProgress}
                         onSubmit={handleAddOrUpdate}
-                        className="bg-white rounded-lg p-4 sm:p-6 shadow-2xl space-y-3 w-full max-w-2xl border-t-4 border-amber-500 my-2 sm:my-4 max-h-[95vh] overflow-y-auto"
-                    >
-                        <div className="flex items-center justify-between mb-3 sm:mb-4">
-                            <h2 className="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-2">
-                                <FaFileAlt className="text-amber-600" /> <span className="text-sm sm:text-lg">{editId ? "Edit Case" : "Add New Case"}</span>
-                            </h2>
-                            <button
-                                type="button"
-                                onClick={() => {
+                    selectedPlaintiffFiles={selectedPlaintiffFiles}
+                    setSelectedPlaintiffFiles={setSelectedPlaintiffFiles}
+                    onBack={() => {
                                     setShowModal(false);
                                     setSelectedFiles([]);
+                                    setSelectedPlaintiffFiles([]);
                                     setEditId(null);
                                 }}
-                                className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-all flex items-center gap-2"
-                                title="Go back"
-                            >
-                                <FaArrowLeft className="text-sm" />
-                                <span className="text-sm font-medium hidden sm:inline">Back</span>
-                            </button>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
-                            <div className="md:col-span-2">
-                                <label className="block text-xs font-semibold text-slate-700 mb-1">Case Title - Cause Title *</label>
-                                <input
-                                    className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                    value={form.title}
-                                    onChange={e => setForm({ ...form, title: e.target.value })}
-                                    required
-                                    placeholder="e.g., Smith vs. Jones"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Case Type <span className="text-slate-500 font-normal text-xs">(Optional)</span></label>
-                                <select
-                                    className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                    value={form.caseType}
-                                    onChange={e => setForm({ ...form, caseType: e.target.value })}
-                                >
-                                    <option value="">Select Case Type</option>
-                                    <option value="Civil">Civil</option>
-                                    <option value="Criminal">Criminal</option>
-                                    <option value="Writ Petition">Writ Petition</option>
-                                    <option value="Appeal">Appeal</option>
-                                    <option value="Revision">Revision</option>
-                                    <option value="Miscellaneous Case">Miscellaneous Case</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-xs font-semibold text-slate-700 mb-1">Case Number <span className="text-slate-500 font-normal">(Optional)</span></label>
-                                <input
-                                    className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                    value={form.caseNumber}
-                                    onChange={e => setForm({ ...form, caseNumber: e.target.value })}
-                                    placeholder="e.g., CV-2024-001"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Case Category <span className="text-slate-500 font-normal text-xs">(Optional)</span></label>
-                                <select
-                                    className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                    value={form.caseCategory}
-                                    onChange={e => setForm({ ...form, caseCategory: e.target.value })}
-                                >
-                                    <option value="">Select Category</option>
-                                    <option value="O.S">O.S (Original Suit)</option>
-                                    <option value="C.C">C.C (Calendar Case)</option>
-                                    <option value="S.C">S.C (Sessions Case)</option>
-                                    <option value="Crl.P">Crl.P (Criminal Petition)</option>
-                                    <option value="Crl.A">Crl.A (Criminal Appeal)</option>
-                                    <option value="W.P">W.P (Writ Petition)</option>
-                                    <option value="W.A">W.A (Writ Appeal)</option>
-                                    <option value="M.C">M.C (Miscellaneous Case)</option>
-                                    <option value="I.A">I.A (Interim Application)</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Court <span className="text-slate-500 font-normal text-xs">(Optional)</span></label>
-                                <input
-                                    className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                    value={form.court}
-                                    onChange={e => setForm({ ...form, court: e.target.value })}
-                                    placeholder="e.g., District & Sessions Court, High Court of Telangana"
-                                />
-                            </div>
-                            <div className="md:col-span-2">
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Parties <span className="text-slate-500 font-normal text-xs">(Optional)</span></label>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <div>
-                                        <label className="block text-xs text-slate-600 mb-1">Plaintiff <span className="text-slate-400">(Optional)</span></label>
-                                        <input
-                                            className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                            value={form.plaintiff}
-                                            onChange={e => setForm({ ...form, plaintiff: e.target.value })}
-                                            placeholder="Name of plaintiff"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs text-slate-600 mb-1">Defendant <span className="text-slate-400">(Optional)</span></label>
-                                        <input
-                                            className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                            value={form.defendant}
-                                            onChange={e => setForm({ ...form, defendant: e.target.value })}
-                                            placeholder="Name of defendant"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="md:col-span-2">
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Advocate Details <span className="text-slate-500 font-normal text-xs">(Optional)</span></label>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <div>
-                                        <label className="block text-xs text-slate-600 mb-1">Advocate of Plaintiff <span className="text-slate-400">(Optional)</span></label>
-                                        <input
-                                            className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                            value={form.advocateForPetitioner}
-                                            onChange={e => setForm({ ...form, advocateForPetitioner: e.target.value })}
-                                            placeholder="Advocate name"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs text-slate-600 mb-1">Advocate of Defendant <span className="text-slate-400">(Optional)</span></label>
-                                        <input
-                                            className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                            value={form.advocateForRespondent}
-                                            onChange={e => setForm({ ...form, advocateForRespondent: e.target.value })}
-                                            placeholder="Advocate name"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Current Stage <span className="text-slate-500 font-normal text-xs">(Optional)</span></label>
-                                <select
-                                    className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                    value={form.currentStage}
-                                    onChange={e => setForm({ ...form, currentStage: e.target.value })}
-                                >
-                                    <option value="">Select Stage</option>
-                                    <option value="Filing / Registration">Filing / Registration</option>
-                                    <option value="Notice Stage">Notice Stage</option>
-                                    <option value="Counter Filed / Awaited">Counter Filed / Awaited</option>
-                                    <option value="Evidence Stage">Evidence Stage</option>
-                                    <option value="Cross-Examination">Cross-Examination</option>
-                                    <option value="Arguments">Arguments</option>
-                                    <option value="Judgment Reserved">Judgment Reserved</option>
-                                    <option value="Judgment Pronounced">Judgment Pronounced</option>
-                                    <option value="Execution Petition (EP)">Execution Petition (EP)</option>
-                                    <option value="Appeal Stage">Appeal Stage</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Case Status <span className="text-slate-500 font-normal text-xs">(Optional)</span></label>
-                                <select
-                                    className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                    value={form.status || "pending"}
-                                    onChange={e => {
-                                        const validStatuses = ["pending", "admitted", "dismissed", "allowed", "disposed", "withdrawn", "compromised", "stayed", "appeal_filed"];
-                                        const newStatus = validStatuses.includes(e.target.value) ? e.target.value : "pending";
-                                        setForm({ ...form, status: newStatus as typeof form.status });
-                                    }}
-                                >
-                                    <option value="pending">Pending</option>
-                                    <option value="admitted">Admitted</option>
-                                    <option value="dismissed">Dismissed</option>
-                                    <option value="allowed">Allowed</option>
-                                    <option value="disposed">Disposed</option>
-                                    <option value="withdrawn">Withdrawn</option>
-                                    <option value="compromised">Compromised / Settled</option>
-                                    <option value="stayed">Stayed</option>
-                                    <option value="appeal_filed">Appeal Filed</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Filing Date <span className="text-slate-500 font-normal text-xs">(Optional)</span></label>
-                                <input
-                                    type="date"
-                                    className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                    value={form.filingDate}
-                                    onChange={e => setForm({ ...form, filingDate: e.target.value })}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-1">Purpose of Hearing - Stage (Date) <span className="text-slate-500 font-normal text-xs">(Optional)</span></label>
-                                <input
-                                    className="mt-1 w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                    value={form.purposeOfHearingStage}
-                                    onChange={e => setForm({ ...form, purposeOfHearingStage: e.target.value })}
-                                    placeholder="e.g., Arguments - 15/02/2025"
-                                />
-                            </div>
-                            <div className="md:col-span-2">
-                                <label className="block text-xs font-semibold text-slate-700 mb-1">Description</label>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
-                                    <div>
-                                        <label className="block text-xs text-slate-600 mb-1">Plaintiff Case</label>
-                                        <textarea
-                                            className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                            value={form.plaintiffCase}
-                                            onChange={e => setForm({ ...form, plaintiffCase: e.target.value })}
-                                            rows={3}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs text-slate-600 mb-1">Defendant/Opponent Case</label>
-                                        <textarea
-                                            className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                            value={form.defendantCase}
-                                            onChange={e => setForm({ ...form, defendantCase: e.target.value })}
-                                            rows={3}
-                                        />
-                                    </div>
-                                </div>
-                                <div className="mt-3">
-                                    <label className="block text-xs text-slate-600 mb-1">Work to be Done</label>
-                                    <textarea
-                                        className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                                        value={form.workToBeDone}
-                                        onChange={e => setForm({ ...form, workToBeDone: e.target.value })}
-                                        rows={2}
-                                    />
-                                </div>
-                            </div>
-                            {!editId && (
-                                <div className="md:col-span-2">
-                                    <label className="block text-xs font-semibold text-slate-700 mb-1">Documents (Optional)</label>
-                                    <div className="mt-1 border-2 border-dashed border-slate-300 rounded p-3">
-                                        <input
-                                            type="file"
-                                            multiple
-                                            accept="image/*,.pdf,.doc,.docx"
-                                            className="hidden"
-                                            id="case-documents"
-                                            onChange={(e) => {
-                                                const files = Array.from(e.target.files || []);
-                                                setSelectedFiles(prev => [...prev, ...files]);
-                                            }}
-                                        />
-                                        <label
-                                            htmlFor="case-documents"
-                                            className="cursor-pointer flex flex-col items-center justify-center py-2"
-                                        >
-                                            <FaUpload className="text-xl text-slate-400 mb-1" />
-                                            <span className="text-xs text-slate-600">Click to upload documents</span>
-                                            <span className="text-xs text-slate-500 mt-0.5">PDF, Images, Word, etc.</span>
-                                        </label>
-                                        {selectedFiles.length > 0 && (
-                                            <div className="mt-2 space-y-1.5">
-                                                {selectedFiles.map((file, idx) => {
-                                                    const fileKey = editId ? `edit_${idx}` : `new_${idx}`;
-                                                    const progress = uploadProgress[fileKey] || 0;
-                                                    const isUploading = uploading && progress > 0 && progress < 100;
-                                                    return (
-                                                        <div key={idx} className="bg-slate-50 p-2 rounded text-xs">
-                                                            <div className="flex items-center justify-between mb-1">
-                                                                <span className="text-slate-700 truncate flex-1">{file.name}</span>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => {
-                                                                        setSelectedFiles(prev => prev.filter((_, i) => i !== idx));
-                                                                        setUploadProgress(prev => {
-                                                                            const newProgress = { ...prev };
-                                                                            delete newProgress[fileKey];
-                                                                            return newProgress;
-                                                                        });
-                                                                    }}
-                                                                    disabled={isUploading}
-                                                                    className="ml-2 text-red-600 hover:text-red-800 disabled:opacity-50"
-                                                                >
-                                                                    <FaTimes className="text-xs" />
-                                                                </button>
-                                                            </div>
-                                                            {isUploading && (
-                                                                <div className="w-full bg-slate-200 rounded-full h-1.5 mt-1">
-                                                                    <div
-                                                                        className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
-                                                                        style={{ width: `${progress}%` }}
-                                                                    ></div>
-                                                                </div>
-                                                            )}
-                                                            {isUploading && (
-                                                                <span className="text-xs text-blue-600 mt-0.5 block">{Math.round(progress)}%</span>
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-                            {!editId && (
-                                <div className="md:col-span-2">
-                                    <label className="block text-xs font-semibold text-slate-700 mb-1">Citations (Optional)</label>
-                                    <div className="mt-1 border-2 border-dashed border-slate-300 rounded p-3">
-                                        <input
-                                            type="file"
-                                            multiple
-                                            accept="image/*,.pdf,.doc,.docx"
-                                            className="hidden"
-                                            id="case-citations"
-                                            onChange={(e) => {
-                                                const files = Array.from(e.target.files || []);
-                                                setSelectedCitationFiles(prev => [...prev, ...files]);
-                                            }}
-                                        />
-                                        <label
-                                            htmlFor="case-citations"
-                                            className="cursor-pointer flex flex-col items-center justify-center py-2"
-                                        >
-                                            <FaUpload className="text-xl text-slate-400 mb-1" />
-                                            <span className="text-xs text-slate-600">Click to upload citation files</span>
-                                            <span className="text-xs text-slate-500 mt-0.5">PDF, Images, Word, etc.</span>
-                                        </label>
-                                        {selectedCitationFiles.length > 0 && (
-                                            <details className="mt-2">
-                                                <summary className="text-xs text-slate-600 cursor-pointer select-none">
-                                                    View selected citations ({selectedCitationFiles.length})
-                                                </summary>
-                                                <div className="mt-2 space-y-1.5">
-                                                    {selectedCitationFiles.map((file, idx) => (
-                                                        <div key={idx} className="bg-slate-50 p-2 rounded text-xs flex items-center justify-between">
-                                                            <span className="text-slate-700 truncate flex-1">{file.name}</span>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    setSelectedCitationFiles(prev => prev.filter((_, i) => i !== idx));
-                                                                }}
-                                                                className="ml-2 text-red-600 hover:text-red-800"
-                                                            >
-                                                                <FaTimes className="text-xs" />
-                                                            </button>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </details>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                        <div className="flex gap-2 pt-3">
-                            <button
-                                type="submit"
-                                disabled={uploading}
-                                className="flex-1 bg-slate-900 text-white rounded px-3 py-2 hover:bg-slate-800 transition font-semibold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                            >
-                                {uploading ? (
-                                    <>
-                                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                                        {editId ? "Updating..." : "Creating..."}
-                                    </>
-                                ) : (
-                                    <>
-                                        <FaCheckCircle /> {editId ? "Update Case" : "Create Case"}
-                                    </>
-                                )}
-                            </button>
-                            <button
-                                type="button"
-                                disabled={uploading}
-                                className="flex-1 bg-slate-200 text-slate-700 px-3 py-2 rounded hover:bg-slate-300 transition font-semibold disabled:opacity-50 text-sm"
-                                onClick={() => {
+                    onCancel={() => {
                                     setShowModal(false);
                                     setSelectedFiles([]);
+                                    setSelectedPlaintiffFiles([]);
                                 }}
-                            >
-                                Cancel
-                            </button>
-                        </div>
-                    </form>
-                </div>
+                />
             )}
         </div>
     );
