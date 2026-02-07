@@ -340,7 +340,8 @@ const CasesPage: React.FC = () => {
                 caseIdForUpload = newCaseId;
             }
 
-            // Upload plaintiff/petitioner documents if any were selected
+            let uploadFailed = false;
+            // Upload plaintiff/petitioner documents if any were selected (one file per request)
             if (selectedPlaintiffFiles.length > 0 && caseIdForUpload) {
                 const { getFirestore, collection, addDoc, Timestamp } = await import("firebase/firestore");
                 const { app } = await import("../../../lib/firebase/config");
@@ -381,17 +382,18 @@ const CasesPage: React.FC = () => {
                     } catch (uploadError) {
                         console.error("Error uploading plaintiff file:", uploadError);
                         const msg = uploadError instanceof Error ? uploadError.message : "";
-                        setError(msg.includes("permission denied") || msg.includes("GCS_SETUP") || msg.includes("FIX_GCS_403") ? msg : `Failed to upload ${file.name}. Please try uploading it manually in the case details.`);
+                        setError(msg.includes("permission denied") || msg.includes("GCS_SETUP") || msg.includes("FIX_GCS_403") ? msg : `Failed to upload ${file.name}. You can add it later in case Documents.`);
                         setUploadProgress(prev => {
                             const newProgress = { ...prev };
                             delete newProgress[fileKey];
                             return newProgress;
                         });
+                        uploadFailed = true;
                     }
                 }
             }
 
-            // Upload documents if any were selected
+            // Upload defendant/opposite party documents (one file per request)
             if (selectedFiles.length > 0 && caseIdForUpload) {
                 const { getFirestore, collection, addDoc, Timestamp } = await import("firebase/firestore");
                 const { app } = await import("../../../lib/firebase/config");
@@ -411,7 +413,7 @@ const CasesPage: React.FC = () => {
                         const isImage = fileType.startsWith("image/");
                         const isPDF = fileType === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
 
-                        // Save document metadata to Firestore
+                        // Save document metadata to Firestore (Defendant / Opposite Party)
                         await addDoc(collection(db, "documents"), {
                             caseId: caseIdForUpload,
                             name: file.name,
@@ -423,6 +425,7 @@ const CasesPage: React.FC = () => {
                             size: file.size,
                             isImage,
                             isPDF,
+                            category: "defendant",
                         });
 
                         // Clear progress after successful upload
@@ -434,18 +437,18 @@ const CasesPage: React.FC = () => {
                     } catch (uploadError) {
                         console.error("Error uploading file:", uploadError);
                         const msg = uploadError instanceof Error ? uploadError.message : "";
-                        setError(msg.includes("permission denied") || msg.includes("GCS_SETUP") || msg.includes("FIX_GCS_403") ? msg : `Failed to upload ${file.name}. Please try uploading it manually in the case details.`);
+                        setError(msg.includes("permission denied") || msg.includes("GCS_SETUP") || msg.includes("FIX_GCS_403") ? msg : `Failed to upload ${file.name}. You can add it later in case Documents.`);
                         setUploadProgress(prev => {
                             const newProgress = { ...prev };
                             delete newProgress[fileKey];
                             return newProgress;
                         });
-                        // Continue with other files even if one fails
+                        uploadFailed = true;
                     }
                 }
             }
 
-            // Upload citations if any were selected (store as documents with category=citation)
+            // Upload citations (one file per request) (store as documents with category=citation)
             if (selectedCitationFiles.length > 0 && caseIdForUpload) {
                 const { getFirestore, collection, addDoc, Timestamp } = await import("firebase/firestore");
                 const { app } = await import("../../../lib/firebase/config");
@@ -475,9 +478,15 @@ const CasesPage: React.FC = () => {
                     } catch (uploadError) {
                         console.error("Error uploading citation file:", uploadError);
                         const msg = uploadError instanceof Error ? uploadError.message : "";
-                        setError(msg.includes("permission denied") || msg.includes("GCS_SETUP") || msg.includes("FIX_GCS_403") ? msg : `Failed to upload citation ${file.name}. You can try uploading it later from the case details page.`);
+                        setError(msg.includes("permission denied") || msg.includes("GCS_SETUP") || msg.includes("FIX_GCS_403") ? msg : `Failed to upload citation ${file.name}. Add it later in Citations tab.`);
+                        uploadFailed = true;
                     }
                 }
+            }
+
+            if (uploadFailed) {
+                setUploading(false);
+                return;
             }
 
             setShowModal(false);
