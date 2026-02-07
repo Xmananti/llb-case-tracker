@@ -40,7 +40,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const formData = await request.formData();
+    let formData: FormData;
+    try {
+      formData = await request.formData();
+    } catch (parseError) {
+      const msg = parseError instanceof Error ? parseError.message : "";
+      if (msg.includes("multipart") || msg.includes("end of")) {
+        return NextResponse.json(
+          {
+            error:
+              "Request body was truncated. Try a smaller file (e.g. under 10MB) or restart the dev server after changing next.config body size limit.",
+          },
+          { status: 413, headers: corsHeaders }
+        );
+      }
+      throw parseError;
+    }
     const file = formData.get("file") as File;
     const path = formData.get("path") as string;
 
@@ -116,6 +131,20 @@ export async function POST(request: NextRequest) {
       } else if (error.message.includes("GCS_BUCKET") || error.message.includes("GCS_")) {
         errorMessage =
           "Server configuration error: Google Cloud Storage is not configured.";
+      } else if (
+        error.message.includes("403") ||
+        error.message.includes("storage.objects.create") ||
+        error.message.includes("Permission") ||
+        error.message.includes("denied")
+      ) {
+        errorMessage =
+          "Storage permission denied. Grant the service account Storage Object Admin on the bucket. See FIX_GCS_403.md for step-by-step fix.";
+      } else if (
+        error.message.includes("multipart") ||
+        error.message.includes("Unexpected end")
+      ) {
+        errorMessage =
+          "Upload body was truncated. Try a smaller file (under 10MB) and restart the dev server.";
       }
     }
 

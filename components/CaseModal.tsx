@@ -1,8 +1,5 @@
 import React, { Dispatch, SetStateAction } from "react";
 import { FaFileAlt, FaArrowLeft, FaUpload, FaTimes, FaCheckCircle } from "react-icons/fa";
-import dynamic from "next/dynamic";
-
-const RichTextEditor = dynamic(() => import("./RichTextEditor"), { ssr: false });
 
 export interface CaseFormData {
     title: string;
@@ -279,22 +276,22 @@ const CaseModal: React.FC<CaseModalProps> = ({
                     <div className="md:col-span-2 lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="min-w-0">
                             <label className="block text-sm font-semibold text-slate-700 mb-1">Plaintiff Case</label>
-                            <RichTextEditor
-                                key="plaintiff-case-editor"
+                            <textarea
+                                className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent min-h-[160px]"
                                 value={form.plaintiffCase}
-                                onChange={v => setForm(prev => ({ ...prev, plaintiffCase: v }))}
+                                onChange={e => setForm(prev => ({ ...prev, plaintiffCase: e.target.value }))}
                                 placeholder="Plaintiff case details..."
-                                minHeight="160px"
+                                rows={6}
                             />
                         </div>
                         <div className="min-w-0">
                             <label className="block text-sm font-semibold text-slate-700 mb-1">Defendant / Opponent Case</label>
-                            <RichTextEditor
-                                key="defendant-case-editor"
+                            <textarea
+                                className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent min-h-[160px]"
                                 value={form.defendantCase}
-                                onChange={v => setForm(prev => ({ ...prev, defendantCase: v }))}
+                                onChange={e => setForm(prev => ({ ...prev, defendantCase: e.target.value }))}
                                 placeholder="Defendant case details..."
-                                minHeight="160px"
+                                rows={6}
                             />
                         </div>
                     </div>

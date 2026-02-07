@@ -66,7 +66,7 @@ export async function uploadFile(
           // If response is not JSON, check status
           if (response.status === 413) {
             errorMessage =
-              "File is too large. Maximum file size is 100MB. For files over 4MB, please contact support.";
+              "File is too large or request was truncated. Try a smaller file (e.g. under 10MB) and restart the dev server.";
           } else if (response.status === 0 || response.type === "opaque") {
             errorMessage =
               "CORS error: Upload failed due to network restrictions. Please check your connection and try again.";

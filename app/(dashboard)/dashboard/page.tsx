@@ -16,6 +16,15 @@ interface CaseDoc {
     nextHearingDate?: string;
     workToBeDone?: string;
     court?: string;
+    fileNumber?: string;
+    year?: string;
+    filingDate?: string;
+    plaintiff?: string;
+    defendant?: string;
+    petitioner?: string;
+    respondent?: string;
+    complainant?: string;
+    accused?: string;
 }
 
 type ViewType = "table" | "grid";
@@ -56,6 +65,15 @@ const DashboardHome: React.FC = () => {
                     nextHearingDate?: string;
                     workToBeDone?: string;
                     court?: string;
+                    fileNumber?: string;
+                    year?: string;
+                    filingDate?: string;
+                    plaintiff?: string;
+                    defendant?: string;
+                    petitioner?: string;
+                    respondent?: string;
+                    complainant?: string;
+                    accused?: string;
                     [key: string]: unknown;
                 }>;
 
@@ -70,6 +88,15 @@ const DashboardHome: React.FC = () => {
                     nextHearingDate: c.nextHearingDate,
                     workToBeDone: c.workToBeDone,
                     court: c.court,
+                    fileNumber: c.fileNumber,
+                    year: c.year,
+                    filingDate: c.filingDate,
+                    plaintiff: c.plaintiff,
+                    defendant: c.defendant,
+                    petitioner: c.petitioner,
+                    respondent: c.respondent,
+                    complainant: c.complainant,
+                    accused: c.accused,
                 }));
 
                 // Sort by updatedAt (most recent first)
@@ -90,14 +117,25 @@ const DashboardHome: React.FC = () => {
         fetchCases();
     }, [user, userData]);
 
-    const filteredCases = cases.filter(c =>
-        searchQuery.trim() === "" ||
-        c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        c.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        c.caseNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        c.workToBeDone?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        c.court?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const q = searchQuery.trim().toLowerCase();
+    const getCaseYear = (c: CaseDoc) =>
+        c.year || (c.filingDate ? String(new Date(c.filingDate).getFullYear()) : "");
+    const partyNames = (c: CaseDoc) =>
+        [c.plaintiff, c.defendant, c.petitioner, c.respondent, c.complainant, c.accused]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
+
+    const filteredCases = cases.filter((c) => {
+        if (!q) return true;
+        return (
+            c.court?.toLowerCase().includes(q) ||
+            c.caseNumber?.toLowerCase().includes(q) ||
+            getCaseYear(c).includes(q) ||
+            c.fileNumber?.toLowerCase().includes(q) ||
+            partyNames(c).includes(q)
+        );
+    });
 
     const displayedCases = filteredCases.slice(0, displayedCount);
     const hasMore = displayedCount < filteredCases.length;
@@ -225,10 +263,10 @@ const DashboardHome: React.FC = () => {
                     </div>
                     )}
 
-                    {/* Search Bar (only for table view when there are cases) */}
-                    {cases.length > 0 && viewType === "table" && (
+                    {/* Search Bar — filter by court, case number, year, file number or party name */}
+                    {cases.length > 0 && (
                         <div className="mb-6">
-                            <div className="relative max-w-md">
+                            <div className="relative max-w-xl">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                     <FaSearch className="text-slate-400" />
                                 </div>
@@ -236,7 +274,7 @@ const DashboardHome: React.FC = () => {
                                     type="text"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Search cases by title, case number, work to be done, or court..."
+                                    placeholder="Search by court, case number, year, file number or party name..."
                                     className="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                                 />
                                 {searchQuery && (

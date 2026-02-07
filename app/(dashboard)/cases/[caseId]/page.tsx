@@ -11,6 +11,7 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { FaFileAlt, FaCalendarAlt, FaUser, FaBuilding, FaHashtag, FaTag, FaCheckCircle, FaClock, FaPauseCircle, FaUpload, FaTrash, FaDownload, FaEdit, FaFilePdf, FaComments, FaPaperPlane, FaEye, FaArrowLeft, FaTimes, FaChevronDown, FaChevronUp } from "react-icons/fa";
+import { useSignedUrl } from "../../../../hooks/useSignedUrl";
 
 interface DocumentResource {
     id: string;
@@ -86,6 +87,12 @@ const taskSchema = z.object({
 type TaskForm = z.infer<typeof taskSchema>;
 
 const tabs = ["Documents", "Citations", "Orders/Judgments", "Hearings", "Tasks", "Conversations"];
+
+/** Strip HTML tags and normalize whitespace for plain text display (legacy data may contain HTML). */
+function stripHtml(html: string): string {
+    if (!html || typeof html !== "string") return "";
+    return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+}
 
 const CaseDetailsPage: React.FC = () => {
     const { caseId } = useParams<{ caseId: string }>();
@@ -177,278 +184,191 @@ const CaseDetailsPage: React.FC = () => {
                             Edit Case
                         </button>
                     </div>
-                    <div className="mb-4 bg-white rounded-lg shadow-md p-4 border-l-4 border-amber-500">
-                        <div className="flex justify-between items-start mb-4">
-                            <div className="flex-1">
-                                <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mb-2 break-words">{caseData.title}</h1>
-                                {caseData.status && (
-                                    <div className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold mb-4 ${caseData.status === "admitted" || caseData.status === "allowed" ? "bg-green-100 text-green-800" :
-                                        caseData.status === "dismissed" ? "bg-red-100 text-red-800" :
-                                            caseData.status === "disposed" ? "bg-gray-100 text-gray-800" :
-                                                caseData.status === "withdrawn" ? "bg-orange-100 text-orange-800" :
-                                                    caseData.status === "compromised" ? "bg-blue-100 text-blue-800" :
-                                                        caseData.status === "stayed" ? "bg-yellow-100 text-yellow-800" :
-                                                            caseData.status === "appeal_filed" ? "bg-purple-100 text-purple-800" :
-                                                                caseData.status === "pending" ? "bg-yellow-100 text-yellow-800" :
-                                                                    "bg-slate-100 text-slate-800"
-                                        }`}>
-                                        {caseData.status === "admitted" || caseData.status === "allowed" ? <FaCheckCircle /> :
-                                            caseData.status === "dismissed" ? <FaTimes /> :
-                                                caseData.status === "disposed" ? <FaCheckCircle /> :
-                                                    caseData.status === "withdrawn" ? <FaClock /> :
-                                                        caseData.status === "compromised" ? <FaCheckCircle /> :
-                                                            caseData.status === "stayed" ? <FaPauseCircle /> :
-                                                                caseData.status === "appeal_filed" ? <FaFileAlt /> :
-                                                                    caseData.status === "pending" ? <FaClock /> :
-                                                                        <FaClock />}
-                                        <span className="capitalize">{caseData.status.replace("_", " ")}</span>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
+                    <div className="mb-4 bg-white rounded-lg shadow-md p-3 sm:p-4 border-l-4 border-amber-500">
+                        <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mb-3 break-words">{caseData.title}</h1>
 
-                        {/* Primary Information Section */}
-                        <div className="bg-amber-50 rounded-lg p-4 mb-4 border border-amber-200">
-                            <h2 className="text-sm font-bold text-slate-800 mb-3 uppercase tracking-wide">Primary Information</h2>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Visible (always): Court, Case number, Plaintiff, Defendant, Case status, Work to be done. Other details in Additional details when toggle is open. */}
+                        <div className="rounded-lg bg-slate-50/80 border border-slate-200 p-3 sm:p-4 mb-3">
+                            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
                                 {caseData.court && (
-                                    <div className="flex items-start gap-3">
-                                        <FaBuilding className="text-amber-600 mt-0.5 shrink-0" />
-                                        <div>
-                                            <span className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1">Court</span>
-                                            <span className="text-base font-semibold text-slate-900">{caseData.court}</span>
-                                        </div>
+                                    <div>
+                                        <dt className="text-slate-500 font-medium">Court:</dt>
+                                        <dd className="text-slate-900 mt-0.5">{caseData.court}</dd>
                                     </div>
                                 )}
                                 {caseData.caseNumber && (
-                                    <div className="flex items-start gap-3">
-                                        <FaHashtag className="text-amber-600 mt-0.5 shrink-0" />
-                                        <div>
-                                            <span className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1">Case Number</span>
-                                            <span className="text-base font-semibold text-slate-900">{caseData.caseNumber}</span>
-                                        </div>
+                                    <div>
+                                        <dt className="text-slate-500 font-medium">Case number:</dt>
+                                        <dd className="text-slate-900 mt-0.5">{caseData.caseNumber}</dd>
                                     </div>
                                 )}
                                 {(caseData.plaintiff || caseData.petitioner || caseData.complainant) && (
-                                    <div className="flex items-start gap-3">
-                                        <FaUser className="text-amber-600 mt-0.5 shrink-0" />
-                                        <div>
-                                            <span className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1">
-                                                {caseData.plaintiff ? "Plaintiff" : caseData.petitioner ? "Petitioner" : "Complainant"}
-                                            </span>
-                                            <span className="text-base font-semibold text-slate-900">
-                                                {caseData.plaintiff || caseData.petitioner || caseData.complainant}
-                                            </span>
-                                        </div>
+                                    <div>
+                                        <dt className="text-slate-500 font-medium">Plaintiff:</dt>
+                                        <dd className="text-slate-900 mt-0.5">{caseData.plaintiff || caseData.petitioner || caseData.complainant}</dd>
                                     </div>
                                 )}
-                                <div className="flex items-start gap-3 md:col-span-2">
-                                    <FaFileAlt className="text-amber-600 mt-0.5 shrink-0" />
-                                    <div className="flex-1">
-                                        <span className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1">Work to be Done</span>
-                                        {caseData.workToBeDone ? (
-                                            <p className="text-sm text-slate-700 whitespace-pre-wrap">{caseData.workToBeDone}</p>
-                                        ) : (
-                                            <p className="text-sm text-slate-400 italic">No work specified</p>
-                                        )}
+                                {(caseData.defendant || caseData.respondent || caseData.accused) && (
+                                    <div>
+                                        <dt className="text-slate-500 font-medium">Defendant:</dt>
+                                        <dd className="text-slate-900 mt-0.5">{caseData.defendant || caseData.respondent || caseData.accused}</dd>
                                     </div>
+                                )}
+                            </dl>
+                            {caseData.status && (
+                                <div className="mt-3 pt-3 border-t border-slate-200">
+                                    <dt className="text-slate-500 font-medium mb-1.5">Case status:</dt>
+                                    <dd className="mt-0.5">
+                                        <span className={`inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium capitalize ${caseData.status === "admitted" || caseData.status === "allowed" ? "bg-green-100 text-green-800" : caseData.status === "dismissed" ? "bg-red-100 text-red-800" : caseData.status === "disposed" ? "bg-slate-100 text-slate-800" : caseData.status === "withdrawn" ? "bg-orange-100 text-orange-800" : caseData.status === "compromised" ? "bg-blue-100 text-blue-800" : caseData.status === "stayed" ? "bg-yellow-100 text-yellow-800" : caseData.status === "appeal_filed" ? "bg-purple-100 text-purple-800" : caseData.status === "pending" ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-800"}`}>
+                                            {caseData.status.replace("_", " ")}
+                                        </span>
+                                    </dd>
                                 </div>
-                            </div>
+                            )}
+                            {caseData.workToBeDone && (
+                                <div className="mt-3 pt-3 border-t border-slate-200">
+                                    <dt className="text-slate-500 font-medium mb-1">Work to be done:</dt>
+                                    <dd className="text-slate-700 mt-0.5 text-sm leading-relaxed whitespace-pre-wrap">{caseData.workToBeDone}</dd>
+                                </div>
+                            )}
                         </div>
 
-                        {/* Additional Details Section - Collapsible */}
-                        <div className="border-t border-slate-200 pt-4">
+                        {/* Additional details – collapsible */}
+                        <div className="border-t border-slate-200 pt-3">
                             <button
                                 onClick={() => setShowAdditionalDetails(!showAdditionalDetails)}
-                                className="w-full flex items-center justify-between text-left mb-3 hover:text-amber-600 transition-colors"
+                                className="w-full flex items-center justify-between text-left py-1.5 rounded-lg hover:bg-slate-50 transition-colors"
                             >
-                                <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Additional Details</h2>
+                                <h2 className="text-sm font-bold text-slate-800">Additional details</h2>
                                 {showAdditionalDetails ? (
-                                    <FaChevronUp className="text-slate-600" />
+                                    <FaChevronUp className="text-slate-500" />
                                 ) : (
-                                    <FaChevronDown className="text-slate-600" />
+                                    <FaChevronDown className="text-slate-500" />
                                 )}
                             </button>
 
                             {showAdditionalDetails && (
-                                <div className="space-y-4">
-                                    {/* Case Information */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                                        {caseData.caseType && (
-                                            <div className="flex items-center gap-2 text-slate-700">
-                                                <FaTag className="text-amber-600 shrink-0" />
-                                                <div>
-                                                    <span className="font-semibold">Case Type:</span> {caseData.caseType}
-                                                </div>
-                                            </div>
-                                        )}
-                                        {caseData.caseCategory && (
-                                            <div className="flex items-center gap-2 text-slate-700">
-                                                <FaTag className="text-amber-600 shrink-0" />
-                                                <div>
-                                                    <span className="font-semibold">Category:</span> {caseData.caseCategory}
-                                                </div>
-                                            </div>
-                                        )}
-                                        {caseData.currentStage && (
-                                            <div className="flex items-center gap-2 text-slate-700">
-                                                <FaFileAlt className="text-amber-600 shrink-0" />
-                                                <div>
-                                                    <span className="font-semibold">Current Stage:</span> {caseData.currentStage}
-                                                </div>
-                                            </div>
-                                        )}
-                                        {caseData.filingDate && (
-                                            <div className="flex items-center gap-2 text-slate-700">
-                                                <FaCalendarAlt className="text-amber-600 shrink-0" />
-                                                <div>
-                                                    <span className="font-semibold">Filing Date:</span> {new Date(caseData.filingDate).toLocaleDateString()}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Parties Information */}
-                                    {(caseData.defendant || caseData.respondent || caseData.accused) && (
-                                        <div className="pt-3 border-t border-slate-200">
-                                            <h3 className="text-sm font-semibold text-slate-800 mb-2">Parties</h3>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                                                {caseData.defendant && (
-                                                    <div className="flex items-center gap-2 text-slate-700">
-                                                        <FaUser className="text-amber-600 shrink-0" />
-                                                        <div>
-                                                            <span className="font-semibold">Defendant:</span> {caseData.defendant}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                {caseData.respondent && (
-                                                    <div className="flex items-center gap-2 text-slate-700">
-                                                        <FaUser className="text-amber-600 shrink-0" />
-                                                        <div>
-                                                            <span className="font-semibold">Respondent:</span> {caseData.respondent}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                {caseData.accused && (
-                                                    <div className="flex items-center gap-2 text-slate-700">
-                                                        <FaUser className="text-amber-600 shrink-0" />
-                                                        <div>
-                                                            <span className="font-semibold">Accused:</span> {caseData.accused}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Advocate Information */}
-                                    {(caseData.advocateForPetitioner || caseData.advocateForRespondent || caseData.publicProsecutor) && (
-                                        <div className="pt-3 border-t border-slate-200">
-                                            <h3 className="text-sm font-semibold text-slate-800 mb-2">Advocate Details</h3>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                                                {caseData.advocateForPetitioner && (
-                                                    <div className="flex items-center gap-2 text-slate-700">
-                                                        <FaUser className="text-amber-600 shrink-0" />
-                                                        <div>
-                                                            <span className="font-semibold">Advocate for Petitioner:</span> {caseData.advocateForPetitioner}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                {caseData.advocateForRespondent && (
-                                                    <div className="flex items-center gap-2 text-slate-700">
-                                                        <FaUser className="text-amber-600 shrink-0" />
-                                                        <div>
-                                                            <span className="font-semibold">Advocate for Respondent:</span> {caseData.advocateForRespondent}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                {caseData.publicProsecutor && (
-                                                    <div className="flex items-center gap-2 text-slate-700">
-                                                        <FaUser className="text-amber-600 shrink-0" />
-                                                        <div>
-                                                            <span className="font-semibold">Public Prosecutor:</span> {caseData.publicProsecutor}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Hearing Information */}
-                                    {(caseData.lastHearingDate || caseData.nextHearingDate || caseData.hearingPurpose || caseData.purposeOfHearingStage) && (
-                                        <div className="pt-3 border-t border-slate-200">
-                                            <h3 className="text-sm font-semibold text-slate-800 mb-2">Hearing Information</h3>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                                                {caseData.lastHearingDate && (
-                                                    <div className="flex items-center gap-2 text-slate-700">
-                                                        <FaCalendarAlt className="text-amber-600 shrink-0" />
-                                                        <div>
-                                                            <span className="font-semibold">Last Hearing:</span> {new Date(caseData.lastHearingDate).toLocaleDateString()}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                {caseData.nextHearingDate && (
-                                                    <div className="flex items-center gap-2 text-slate-700">
-                                                        <FaCalendarAlt className="text-amber-600 shrink-0" />
-                                                        <div>
-                                                            <span className="font-semibold">Next Hearing:</span> {new Date(caseData.nextHearingDate).toLocaleDateString()}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                {caseData.hearingPurpose && (
-                                                    <div className="flex items-start gap-2 text-slate-700 md:col-span-2">
-                                                        <FaCalendarAlt className="text-amber-600 mt-0.5 shrink-0" />
-                                                        <div>
-                                                            <span className="font-semibold">Hearing Purpose:</span>
-                                                            <p className="text-slate-600 mt-1 whitespace-pre-wrap">{caseData.hearingPurpose}</p>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                {caseData.purposeOfHearingStage && (
-                                                    <div className="flex items-start gap-2 text-amber-700 md:col-span-2">
-                                                        <FaCalendarAlt className="mt-0.5 shrink-0" />
-                                                        <div>
-                                                            <span className="font-semibold text-xs sm:text-sm">Purpose of Hearing - Stage (Date)</span>
-                                                            <p className="text-xs sm:text-sm text-amber-800 mt-1 whitespace-pre-wrap">{caseData.purposeOfHearingStage}</p>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Description Section */}
+                                <div className="mt-4 space-y-6">
+                                    <p className="text-slate-500 text-xs font-medium uppercase tracking-wide">Other details</p>
+                                    {/* Plaintiff / Defendant case descriptions – plain text */}
                                     {(caseData.plaintiffCase || caseData.description || caseData.defendantCase) && (
-                                        <div className="pt-3 border-t border-slate-200">
-                                            <h3 className="text-sm font-semibold text-slate-800 mb-2">Description</h3>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                                        <div className="rounded-lg bg-slate-50/60 border border-slate-100 p-4">
+                                            <h3 className="text-sm font-semibold text-slate-700 mb-3">Case descriptions</h3>
+                                            <div className="space-y-4 text-sm">
                                                 {(caseData.plaintiffCase || caseData.description) && (
                                                     <div>
-                                                        <h4 className="font-semibold text-slate-700 mb-1">Plaintiff Case</h4>
-                                                        <p className="text-slate-600 whitespace-pre-wrap">
-                                                            {caseData.plaintiffCase || caseData.description}
-                                                        </p>
+                                                        <dt className="text-slate-500 font-medium mb-1">Plaintiff case:</dt>
+                                                        <dd className="text-slate-700 mt-0.5 leading-relaxed whitespace-pre-wrap">{stripHtml(caseData.plaintiffCase || caseData.description || "")}</dd>
                                                     </div>
                                                 )}
                                                 {caseData.defendantCase && (
                                                     <div>
-                                                        <h4 className="font-semibold text-slate-700 mb-1">Defendant/Opponent Case</h4>
-                                                        <p className="text-slate-600 whitespace-pre-wrap">
-                                                            {caseData.defendantCase}
-                                                        </p>
+                                                        <dt className="text-slate-500 font-medium mb-1">Defendant case:</dt>
+                                                        <dd className="text-slate-700 mt-0.5 leading-relaxed whitespace-pre-wrap">{stripHtml(caseData.defendantCase)}</dd>
                                                     </div>
                                                 )}
                                             </div>
+                                        </div>
+                                    )}
+
+                                    {/* Case information */}
+                                    {(caseData.caseType || caseData.caseCategory || caseData.currentStage || caseData.filingDate) && (
+                                        <div className="rounded-lg bg-slate-50/60 border border-slate-100 p-4">
+                                            <h3 className="text-sm font-semibold text-slate-700 mb-3">Case information</h3>
+                                            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                                                {caseData.caseType && (
+                                                    <div>
+                                                        <dt className="text-slate-500 font-medium">Case type:</dt>
+                                                        <dd className="text-slate-900 mt-0.5">{caseData.caseType}</dd>
+                                                    </div>
+                                                )}
+                                                {caseData.caseCategory && (
+                                                    <div>
+                                                        <dt className="text-slate-500 font-medium">Category:</dt>
+                                                        <dd className="text-slate-900 mt-0.5">{caseData.caseCategory}</dd>
+                                                    </div>
+                                                )}
+                                                {caseData.currentStage && (
+                                                    <div>
+                                                        <dt className="text-slate-500 font-medium">Current stage:</dt>
+                                                        <dd className="text-slate-900 mt-0.5">{caseData.currentStage}</dd>
+                                                    </div>
+                                                )}
+                                                {caseData.filingDate && (
+                                                    <div>
+                                                        <dt className="text-slate-500 font-medium">Filing date:</dt>
+                                                        <dd className="text-slate-900 mt-0.5">{new Date(caseData.filingDate).toLocaleDateString()}</dd>
+                                                    </div>
+                                                )}
+                                            </dl>
+                                        </div>
+                                    )}
+
+                                    {/* Advocate details */}
+                                    {(caseData.advocateForPetitioner || caseData.advocateForRespondent || caseData.publicProsecutor) && (
+                                        <div className="rounded-lg bg-slate-50/60 border border-slate-100 p-4">
+                                            <h3 className="text-sm font-semibold text-slate-700 mb-3">Advocate details</h3>
+                                            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                                                {caseData.advocateForPetitioner && (
+                                                    <div>
+                                                        <dt className="text-slate-500 font-medium">Advocate for petitioner:</dt>
+                                                        <dd className="text-slate-900 mt-0.5">{caseData.advocateForPetitioner}</dd>
+                                                    </div>
+                                                )}
+                                                {caseData.advocateForRespondent && (
+                                                    <div>
+                                                        <dt className="text-slate-500 font-medium">Advocate for respondent:</dt>
+                                                        <dd className="text-slate-900 mt-0.5">{caseData.advocateForRespondent}</dd>
+                                                    </div>
+                                                )}
+                                                {caseData.publicProsecutor && (
+                                                    <div>
+                                                        <dt className="text-slate-500 font-medium">Public prosecutor:</dt>
+                                                        <dd className="text-slate-900 mt-0.5">{caseData.publicProsecutor}</dd>
+                                                    </div>
+                                                )}
+                                            </dl>
+                                        </div>
+                                    )}
+
+                                    {/* Hearing information */}
+                                    {(caseData.lastHearingDate || caseData.nextHearingDate || caseData.hearingPurpose || caseData.purposeOfHearingStage) && (
+                                        <div className="rounded-lg bg-slate-50/60 border border-slate-100 p-4">
+                                            <h3 className="text-sm font-semibold text-slate-700 mb-3">Hearing information</h3>
+                                            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                                                {caseData.lastHearingDate && (
+                                                    <div>
+                                                        <dt className="text-slate-500 font-medium">Last hearing:</dt>
+                                                        <dd className="text-slate-900 mt-0.5">{new Date(caseData.lastHearingDate).toLocaleDateString()}</dd>
+                                                    </div>
+                                                )}
+                                                {caseData.nextHearingDate && (
+                                                    <div>
+                                                        <dt className="text-slate-500 font-medium">Next hearing:</dt>
+                                                        <dd className="text-slate-900 mt-0.5">{new Date(caseData.nextHearingDate).toLocaleDateString()}</dd>
+                                                    </div>
+                                                )}
+                                                {caseData.hearingPurpose && (
+                                                    <div className="sm:col-span-2">
+                                                        <dt className="text-slate-500 font-medium">Hearing purpose:</dt>
+                                                        <dd className="text-slate-700 mt-1 whitespace-pre-wrap">{caseData.hearingPurpose}</dd>
+                                                    </div>
+                                                )}
+                                                {caseData.purposeOfHearingStage && (
+                                                    <div className="sm:col-span-2">
+                                                        <dt className="text-slate-500 font-medium">Purpose of hearing – stage (date):</dt>
+                                                        <dd className="text-amber-800 mt-1 whitespace-pre-wrap text-sm">{caseData.purposeOfHearingStage}</dd>
+                                                    </div>
+                                                )}
+                                            </dl>
                                         </div>
                                     )}
 
                                     {/* Notes */}
                                     {caseData.notes && (
-                                        <div className="pt-3 border-t border-slate-200">
-                                            <div className="text-sm">
-                                                <span className="font-semibold text-slate-700">Notes / Remarks:</span>
-                                                <p className="text-slate-600 mt-1 whitespace-pre-wrap">{caseData.notes}</p>
-                                            </div>
+                                        <div className="rounded-lg bg-slate-50/60 border border-slate-100 p-4">
+                                            <h3 className="text-sm font-semibold text-slate-700 mb-2">Notes / remarks</h3>
+                                            <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap">{caseData.notes}</p>
                                         </div>
                                     )}
                                 </div>
@@ -484,6 +404,137 @@ const CaseDetailsPage: React.FC = () => {
         </div>
     );
 };
+
+/** Document card that resolves a signed URL for private GCS buckets. */
+function DocCard({
+    d,
+    onPreview,
+    onDelete,
+}: {
+    d: DocumentResource & { isImage?: boolean; isPDF?: boolean };
+    onPreview: (url: string, name: string, type: string) => void;
+    onDelete: (id: string, url: string) => void;
+}) {
+    const { signedUrl, loading } = useSignedUrl(d.url);
+    const isImage = d.isImage || d.type?.startsWith("image/");
+    const isPDF = d.isPDF || d.name.toLowerCase().endsWith(".pdf");
+    if (loading) {
+        return (
+            <div className="bg-slate-50 rounded border border-slate-200 overflow-hidden">
+                <div className="aspect-video bg-slate-200 animate-pulse" />
+                <div className="p-3">
+                    <p className="font-medium text-slate-900 text-xs truncate">{d.name}</p>
+                    <p className="text-xs text-slate-500">Loading...</p>
+                </div>
+            </div>
+        );
+    }
+    const url = signedUrl ?? d.url;
+    return (
+        <div className="bg-slate-50 rounded border border-slate-200 hover:shadow-md transition overflow-hidden">
+            {isImage ? (
+                <div className="aspect-video bg-slate-200 relative group cursor-pointer" onClick={() => onPreview(url, d.name, "image")}>
+                    <img src={url} alt={d.name} className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition flex items-center justify-center">
+                        <FaEye className="text-white opacity-0 group-hover:opacity-100 transition" />
+                    </div>
+                </div>
+            ) : isPDF ? (
+                <div className="aspect-video bg-red-50 flex items-center justify-center cursor-pointer" onClick={() => onPreview(url, d.name, "pdf")}>
+                    <div className="text-center">
+                        <FaFilePdf className="text-red-600 text-3xl mx-auto mb-1" />
+                        <p className="text-xs text-slate-600">Click to preview</p>
+                    </div>
+                </div>
+            ) : (
+                <div className="aspect-video bg-slate-200 flex items-center justify-center">
+                    <FaFileAlt className="text-slate-400 text-3xl" />
+                </div>
+            )}
+            <div className="p-3">
+                <p className="font-medium text-slate-900 text-xs mb-1.5 truncate" title={d.name}>{d.name}</p>
+                <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-2">
+                    {d.size != null && <span>{(d.size / 1024).toFixed(1)} KB</span>}
+                    {d.uploadedAt && (
+                        <span>• {new Date(d.uploadedAt.toMillis()).toLocaleDateString()}</span>
+                    )}
+                </div>
+                <div className="flex gap-1.5">
+                    <button
+                        onClick={() => onPreview(url, d.name, isImage ? "image" : isPDF ? "pdf" : "file")}
+                        className="flex-1 bg-slate-900 text-white rounded px-2 py-1.5 hover:bg-slate-800 transition font-medium text-xs flex items-center justify-center gap-1"
+                    >
+                        <FaEye className="text-xs" /> View
+                    </button>
+                    <a
+                        href={url}
+                        download
+                        className="bg-blue-600 text-white rounded px-2 py-1.5 hover:bg-blue-700 transition font-medium text-xs flex items-center justify-center"
+                        title="Download"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <FaDownload className="text-xs" />
+                    </a>
+                    <button
+                        className="bg-red-600 text-white rounded px-2 py-1.5 hover:bg-red-700 transition font-medium text-xs flex items-center justify-center"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onDelete(d.id, d.url);
+                        }}
+                        title="Delete"
+                    >
+                        <FaTrash className="text-xs" />
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/** Preview modal that resolves a signed URL for private GCS. */
+function PreviewModal({
+    previewDoc,
+    onClose,
+}: {
+    previewDoc: { url: string; name: string; type: string };
+    onClose: () => void;
+}) {
+    const { signedUrl, loading, error } = useSignedUrl(previewDoc.url);
+    const url = signedUrl ?? previewDoc.url;
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-2 sm:p-4" onClick={onClose}>
+            <div className="bg-white rounded-lg max-w-4xl w-full max-h-[95vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+                <div className="sticky top-0 bg-white border-b border-slate-200 px-3 sm:px-6 py-3 sm:py-4 flex justify-between items-center">
+                    <h3 className="font-semibold text-slate-900 text-sm sm:text-base truncate flex-1 mr-2">{previewDoc.name}</h3>
+                    <button onClick={onClose} className="text-slate-600 hover:text-slate-900 text-xl sm:text-2xl shrink-0">×</button>
+                </div>
+                <div className="p-3 sm:p-6">
+                    {loading && (
+                        <div className="text-center py-12 text-slate-500">Loading preview...</div>
+                    )}
+                    {error && (
+                        <div className="text-center py-12 text-red-600">{error}</div>
+                    )}
+                    {!loading && !error && (
+                        previewDoc.type === "image" ? (
+                            <img src={url} alt={previewDoc.name} className="max-w-full h-auto mx-auto" />
+                        ) : previewDoc.type === "pdf" ? (
+                            <iframe src={url} className="w-full h-[400px] sm:h-[500px] lg:h-[600px] border-0" title={previewDoc.name} />
+                        ) : (
+                            <div className="text-center py-12">
+                                <FaFileAlt className="text-6xl text-slate-400 mx-auto mb-4" />
+                                <p className="text-slate-600 mb-4">Preview not available for this file type</p>
+                                <a href={url} download className="inline-block bg-slate-900 text-white px-6 py-3 rounded-lg hover:bg-slate-800 transition font-semibold">
+                                    <FaDownload className="inline mr-2" /> Download File
+                                </a>
+                            </div>
+                        )
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
 
 const CaseDocumentsTab: React.FC<{ caseId: string }> = ({ caseId }) => {
     const { user } = useAuth();
@@ -672,105 +723,22 @@ const CaseDocumentsTab: React.FC<{ caseId: string }> = ({ caseId }) => {
             ) : (
                 <>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3">
-                        {docs.map((d) => {
-                            const isImage = d.isImage || d.type?.startsWith("image/");
-                            const isPDF = d.isPDF || d.name.toLowerCase().endsWith(".pdf");
-                            return (
-                                <div key={d.id} className="bg-slate-50 rounded border border-slate-200 hover:shadow-md transition overflow-hidden">
-                                    {isImage ? (
-                                        <div className="aspect-video bg-slate-200 relative group cursor-pointer" onClick={() => setPreviewDoc({ url: d.url, name: d.name, type: "image" })}>
-                                            <img src={d.url} alt={d.name} className="w-full h-full object-cover" />
-                                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition flex items-center justify-center">
-                                                <FaEye className="text-white opacity-0 group-hover:opacity-100 transition" />
-                                            </div>
-                                        </div>
-                                    ) : isPDF ? (
-                                        <div className="aspect-video bg-red-50 flex items-center justify-center cursor-pointer" onClick={() => setPreviewDoc({ url: d.url, name: d.name, type: "pdf" })}>
-                                            <div className="text-center">
-                                                <FaFilePdf className="text-red-600 text-3xl mx-auto mb-1" />
-                                                <p className="text-xs text-slate-600">Click to preview</p>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="aspect-video bg-slate-200 flex items-center justify-center">
-                                            <FaFileAlt className="text-slate-400 text-3xl" />
-                                        </div>
-                                    )}
-                                    <div className="p-3">
-                                        <p className="font-medium text-slate-900 text-xs mb-1.5 truncate" title={d.name}>{d.name}</p>
-                                        <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-2">
-                                            {d.size && <span>{(d.size / 1024).toFixed(1)} KB</span>}
-                                            {d.uploadedAt && (
-                                                <span>• {new Date(d.uploadedAt.toMillis()).toLocaleDateString()}</span>
-                                            )}
-                                        </div>
-                                        <div className="flex gap-1.5">
-                                            <button
-                                                onClick={() => setPreviewDoc({ url: d.url, name: d.name, type: isImage ? "image" : isPDF ? "pdf" : "file" })}
-                                                className="flex-1 bg-slate-900 text-white rounded px-2 py-1.5 hover:bg-slate-800 transition font-medium text-xs flex items-center justify-center gap-1"
-                                            >
-                                                <FaEye className="text-xs" /> View
-                                            </button>
-                                            <a
-                                                href={d.url}
-                                                download
-                                                className="bg-blue-600 text-white rounded px-2 py-1.5 hover:bg-blue-700 transition font-medium text-xs flex items-center justify-center"
-                                                title="Download"
-                                                onClick={(e) => e.stopPropagation()}
-                                            >
-                                                <FaDownload className="text-xs" />
-                                            </a>
-                                            <button
-                                                className="bg-red-600 text-white rounded px-2 py-1.5 hover:bg-red-700 transition font-medium text-xs flex items-center justify-center"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleDelete(d.id, d.url);
-                                                }}
-                                                title="Delete"
-                                            >
-                                                <FaTrash className="text-xs" />
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
+                        {docs.map((d) => (
+                            <DocCard
+                                key={d.id}
+                                d={d}
+                                onPreview={(url, name, type) => setPreviewDoc({ url, name, type })}
+                                onDelete={handleDelete}
+                            />
+                        ))}
                     </div>
 
-                    {/* Preview Modal */}
+                    {/* Preview Modal - uses signed URL for private GCS */}
                     {previewDoc && (
-                        <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-2 sm:p-4" onClick={() => setPreviewDoc(null)}>
-                            <div className="bg-white rounded-lg max-w-4xl w-full max-h-[95vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
-                                <div className="sticky top-0 bg-white border-b border-slate-200 px-3 sm:px-6 py-3 sm:py-4 flex justify-between items-center">
-                                    <h3 className="font-semibold text-slate-900 text-sm sm:text-base truncate flex-1 mr-2">{previewDoc.name}</h3>
-                                    <button
-                                        onClick={() => setPreviewDoc(null)}
-                                        className="text-slate-600 hover:text-slate-900 text-xl sm:text-2xl shrink-0"
-                                    >
-                                        ×
-                                    </button>
-                                </div>
-                                <div className="p-3 sm:p-6">
-                                    {previewDoc.type === "image" ? (
-                                        <img src={previewDoc.url} alt={previewDoc.name} className="max-w-full h-auto mx-auto" />
-                                    ) : previewDoc.type === "pdf" ? (
-                                        <iframe src={previewDoc.url} className="w-full h-[400px] sm:h-[500px] lg:h-[600px] border-0" title={previewDoc.name} />
-                                    ) : (
-                                        <div className="text-center py-12">
-                                            <FaFileAlt className="text-6xl text-slate-400 mx-auto mb-4" />
-                                            <p className="text-slate-600 mb-4">Preview not available for this file type</p>
-                                            <a
-                                                href={previewDoc.url}
-                                                download
-                                                className="inline-block bg-slate-900 text-white px-6 py-3 rounded-lg hover:bg-slate-800 transition font-semibold"
-                                            >
-                                                <FaDownload className="inline mr-2" /> Download File
-                                            </a>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
+                        <PreviewModal
+                            previewDoc={previewDoc}
+                            onClose={() => setPreviewDoc(null)}
+                        />
                     )}
                 </>
             )}
@@ -969,110 +937,94 @@ const CaseCitationsTab: React.FC<{ caseId: string }> = ({ caseId }) => {
             ) : (
                 <>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3">
-                        {docs.map((d) => {
-                            const isImage = d.isImage || d.type?.startsWith("image/");
-                            const isPDF = d.isPDF || d.name.toLowerCase().endsWith(".pdf");
-                            return (
-                                <div key={d.id} className="bg-slate-50 rounded border border-slate-200 hover:shadow-md transition overflow-hidden">
-                                    {isImage ? (
-                                        <div className="aspect-video bg-slate-200 relative group cursor-pointer" onClick={() => setPreviewDoc({ url: d.url, name: d.name, type: "image" })}>
-                                            <img src={d.url} alt={d.name} className="w-full h-full object-cover" />
-                                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition flex items-center justify-center">
-                                                <FaEye className="text-white opacity-0 group-hover:opacity-100 transition" />
-                                            </div>
-                                        </div>
-                                    ) : isPDF ? (
-                                        <div className="aspect-video bg-red-50 flex items-center justify-center cursor-pointer" onClick={() => setPreviewDoc({ url: d.url, name: d.name, type: "pdf" })}>
-                                            <div className="text-center">
-                                                <FaFilePdf className="text-red-600 text-3xl mx-auto mb-1" />
-                                                <p className="text-xs text-slate-600">Click to preview</p>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="aspect-video bg-slate-200 flex items-center justify-center">
-                                            <FaFileAlt className="text-slate-400 text-3xl" />
-                                        </div>
-                                    )}
-                                    <div className="p-3">
-                                        <p className="font-medium text-slate-900 text-xs mb-1.5 truncate" title={d.name}>{d.name}</p>
-                                        <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-2">
-                                            {d.size && <span>{(d.size / 1024).toFixed(1)} KB</span>}
-                                            {d.uploadedAt && (
-                                                <span>• {new Date(d.uploadedAt.toMillis()).toLocaleDateString()}</span>
-                                            )}
-                                        </div>
-                                        <div className="flex gap-1.5">
-                                            <button
-                                                onClick={() => setPreviewDoc({ url: d.url, name: d.name, type: isImage ? "image" : isPDF ? "pdf" : "file" })}
-                                                className="flex-1 bg-slate-900 text-white rounded px-2 py-1.5 hover:bg-slate-800 transition font-medium text-xs flex items-center justify-center gap-1"
-                                            >
-                                                <FaEye className="text-xs" /> View
-                                            </button>
-                                            <a
-                                                href={d.url}
-                                                download
-                                                className="bg-blue-600 text-white rounded px-2 py-1.5 hover:bg-blue-700 transition font-medium text-xs flex items-center justify-center"
-                                                title="Download"
-                                                onClick={(e) => e.stopPropagation()}
-                                            >
-                                                <FaDownload className="text-xs" />
-                                            </a>
-                                            <button
-                                                className="bg-red-600 text-white rounded px-2 py-1.5 hover:bg-red-700 transition font-medium text-xs flex items-center justify-center"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleDelete(d.id, d.url);
-                                                }}
-                                                title="Delete"
-                                            >
-                                                <FaTrash className="text-xs" />
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
+                        {docs.map((d) => (
+                            <DocCard
+                                key={d.id}
+                                d={d}
+                                onPreview={(url, name, type) => setPreviewDoc({ url, name, type })}
+                                onDelete={handleDelete}
+                            />
+                        ))}
                     </div>
-
                     {previewDoc && (
-                        <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-2 sm:p-4" onClick={() => setPreviewDoc(null)}>
-                            <div className="bg-white rounded-lg max-w-4xl w-full max-h-[95vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
-                                <div className="sticky top-0 bg-white border-b border-slate-200 px-3 sm:px-6 py-3 sm:py-4 flex justify-between items-center">
-                                    <h3 className="font-semibold text-slate-900 text-sm sm:text-base truncate flex-1 mr-2">{previewDoc.name}</h3>
-                                    <button
-                                        onClick={() => setPreviewDoc(null)}
-                                        className="text-slate-600 hover:text-slate-900 text-xl sm:text-2xl shrink-0"
-                                    >
-                                        ×
-                                    </button>
-                                </div>
-                                <div className="p-3 sm:p-6">
-                                    {previewDoc.type === "image" ? (
-                                        <img src={previewDoc.url} alt={previewDoc.name} className="max-w-full h-auto mx-auto" />
-                                    ) : previewDoc.type === "pdf" ? (
-                                        <iframe src={previewDoc.url} className="w-full h-[400px] sm:h-[500px] lg:h-[600px] border-0" title={previewDoc.name} />
-                                    ) : (
-                                        <div className="text-center py-12">
-                                            <FaFileAlt className="text-6xl text-slate-400 mx-auto mb-4" />
-                                            <p className="text-slate-600 mb-4">Preview not available for this file type</p>
-                                            <a
-                                                href={previewDoc.url}
-                                                download
-                                                className="inline-block bg-slate-900 text-white px-6 py-3 rounded-lg hover:bg-slate-800 transition font-semibold"
-                                            >
-                                                <FaDownload className="inline mr-2" /> Download File
-                                            </a>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
+                        <PreviewModal previewDoc={previewDoc} onClose={() => setPreviewDoc(null)} />
                     )}
                 </>
             )}
         </div>
     );
 };
+
+/** Chat attachment link with signed URL for private GCS. */
+function AttachmentLink({ att }: { att: { url: string; name: string } }) {
+    const { signedUrl, loading } = useSignedUrl(att.url);
+    if (loading) {
+        return <span className="text-xs text-slate-500 flex items-center gap-1"><FaFileAlt /> {att.name} (loading…)</span>;
+    }
+    const href = signedUrl ?? att.url;
+    return (
+        <a href={href} target="_blank" rel="noopener noreferrer" className="text-xs underline flex items-center gap-1">
+            <FaFileAlt /> {att.name}
+        </a>
+    );
+}
+
+/** Orders/Judgments card with signed URL for private GCS. */
+function OrderJudgmentCard({
+    d,
+    onDelete,
+    onPreview,
+}: {
+    d: DocumentResource & { category?: string };
+    onDelete: (id: string, url: string) => void;
+    onPreview: (url: string, name: string, type: string) => void;
+}) {
+    const { signedUrl, loading } = useSignedUrl(d.url);
+    const url = signedUrl ?? d.url;
+    return (
+        <div className="border border-slate-200 rounded-lg p-4 hover:shadow-md transition">
+            <div className="flex items-start justify-between mb-2">
+                <div className="flex-1 min-w-0">
+                    <h4 className="font-semibold text-slate-900 truncate text-sm">{d.name}</h4>
+                    {d.category && (
+                        <span className={`inline-block mt-1 px-2 py-0.5 rounded text-xs font-semibold ${d.category === "judgment" ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800"}`}>
+                            {d.category === "judgment" ? "Judgment" : "Order"}
+                        </span>
+                    )}
+                </div>
+            </div>
+            <div className="flex gap-2 mt-3">
+                {loading ? (
+                    <span className="flex-1 text-slate-500 text-xs py-2">Loading...</span>
+                ) : (
+                    <>
+                        <a
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex-1 bg-amber-600 text-white rounded px-3 py-2 hover:bg-amber-700 transition font-medium text-xs text-center"
+                        >
+                            <FaEye className="inline mr-1" /> View
+                        </a>
+                        <a
+                            href={url}
+                            download
+                            className="bg-slate-600 text-white rounded px-3 py-2 hover:bg-slate-700 transition font-medium text-xs flex items-center justify-center"
+                        >
+                            <FaDownload className="text-xs" />
+                        </a>
+                    </>
+                )}
+                <button
+                    className="bg-red-600 text-white rounded px-3 py-2 hover:bg-red-700 transition font-medium text-xs flex items-center justify-center"
+                    onClick={() => onDelete(d.id, d.url)}
+                >
+                    <FaTrash className="text-xs" />
+                </button>
+            </div>
+        </div>
+    );
+}
 
 const CaseOrdersJudgmentsTab: React.FC<{ caseId: string }> = ({ caseId }) => {
     const { user } = useAuth();
@@ -1258,62 +1210,13 @@ const CaseOrdersJudgmentsTab: React.FC<{ caseId: string }> = ({ caseId }) => {
             ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {docs.map((d) => (
-                        <div key={d.id} className="border border-slate-200 rounded-lg p-4 hover:shadow-md transition">
-                            <div className="flex items-start justify-between mb-2">
-                                <div className="flex-1 min-w-0">
-                                    <h4 className="font-semibold text-slate-900 truncate text-sm">{d.name}</h4>
-                                    {d.category && (
-                                        <span className={`inline-block mt-1 px-2 py-0.5 rounded text-xs font-semibold ${d.category === "judgment" ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800"
-                                            }`}>
-                                            {d.category === "judgment" ? "Judgment" : "Order"}
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-                            <div className="flex gap-2 mt-3">
-                                <a
-                                    href={d.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex-1 bg-amber-600 text-white rounded px-3 py-2 hover:bg-amber-700 transition font-medium text-xs text-center"
-                                >
-                                    <FaEye className="inline mr-1" /> View
-                                </a>
-                                <a
-                                    href={d.url}
-                                    download
-                                    className="bg-slate-600 text-white rounded px-3 py-2 hover:bg-slate-700 transition font-medium text-xs flex items-center justify-center"
-                                >
-                                    <FaDownload className="text-xs" />
-                                </a>
-                                <button
-                                    className="bg-red-600 text-white rounded px-3 py-2 hover:bg-red-700 transition font-medium text-xs flex items-center justify-center"
-                                    onClick={() => handleDelete(d.id, d.url)}
-                                >
-                                    <FaTrash className="text-xs" />
-                                </button>
-                            </div>
-                        </div>
+                        <OrderJudgmentCard key={d.id} d={d} onDelete={handleDelete} onPreview={(url, name, type) => setPreviewDoc({ url, name, type })} />
                     ))}
                 </div>
             )}
 
             {previewDoc && (
-                <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4" onClick={() => setPreviewDoc(null)}>
-                    <div className="bg-white rounded-lg max-w-4xl w-full max-h-[95vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
-                        <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center">
-                            <h3 className="font-semibold text-slate-900">{previewDoc.name}</h3>
-                            <button onClick={() => setPreviewDoc(null)} className="text-slate-600 hover:text-slate-900 text-2xl">×</button>
-                        </div>
-                        <div className="p-6">
-                            {previewDoc.type === "pdf" ? (
-                                <iframe src={previewDoc.url} className="w-full h-[600px] border-0" title={previewDoc.name} />
-                            ) : (
-                                <img src={previewDoc.url} alt={previewDoc.name} className="max-w-full h-auto mx-auto" />
-                            )}
-                        </div>
-                    </div>
-                </div>
+                <PreviewModal previewDoc={previewDoc} onClose={() => setPreviewDoc(null)} />
             )}
         </div>
     );
@@ -1970,15 +1873,7 @@ const CaseConversationsTab: React.FC<{ caseId: string }> = ({ caseId }) => {
                                             {msg.attachments && msg.attachments.length > 0 && (
                                                 <div className="mt-2 space-y-1">
                                                     {msg.attachments.map((att, idx) => (
-                                                        <a
-                                                            key={idx}
-                                                            href={att.url}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="text-xs underline flex items-center gap-1"
-                                                        >
-                                                            <FaFileAlt /> {att.name}
-                                                        </a>
+                                                        <AttachmentLink key={idx} att={att} />
                                                     ))}
                                                 </div>
                                             )}

@@ -380,7 +380,8 @@ const CasesPage: React.FC = () => {
                         });
                     } catch (uploadError) {
                         console.error("Error uploading plaintiff file:", uploadError);
-                        setError(`Failed to upload ${file.name}. Please try uploading it manually in the case details.`);
+                        const msg = uploadError instanceof Error ? uploadError.message : "";
+                        setError(msg.includes("permission denied") || msg.includes("GCS_SETUP") || msg.includes("FIX_GCS_403") ? msg : `Failed to upload ${file.name}. Please try uploading it manually in the case details.`);
                         setUploadProgress(prev => {
                             const newProgress = { ...prev };
                             delete newProgress[fileKey];
@@ -432,7 +433,8 @@ const CasesPage: React.FC = () => {
                         });
                     } catch (uploadError) {
                         console.error("Error uploading file:", uploadError);
-                        setError(`Failed to upload ${file.name}. Please try uploading it manually in the case details.`);
+                        const msg = uploadError instanceof Error ? uploadError.message : "";
+                        setError(msg.includes("permission denied") || msg.includes("GCS_SETUP") || msg.includes("FIX_GCS_403") ? msg : `Failed to upload ${file.name}. Please try uploading it manually in the case details.`);
                         setUploadProgress(prev => {
                             const newProgress = { ...prev };
                             delete newProgress[fileKey];
@@ -472,7 +474,8 @@ const CasesPage: React.FC = () => {
                         });
                     } catch (uploadError) {
                         console.error("Error uploading citation file:", uploadError);
-                        setError(`Failed to upload citation ${file.name}. You can try uploading it later from the case details page.`);
+                        const msg = uploadError instanceof Error ? uploadError.message : "";
+                        setError(msg.includes("permission denied") || msg.includes("GCS_SETUP") || msg.includes("FIX_GCS_403") ? msg : `Failed to upload citation ${file.name}. You can try uploading it later from the case details page.`);
                     }
                 }
             }

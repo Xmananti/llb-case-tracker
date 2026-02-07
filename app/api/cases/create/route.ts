@@ -3,8 +3,8 @@ import { adminDb } from "../../../../lib/firebase/admin";
 import { z } from "zod";
 
 const caseSchema = z.object({
-  title: z.string().min(2, "Case title is required"),
-  description: z.string().min(2, "Description is required"),
+  title: z.string().optional(),
+  description: z.string().optional(),
   plaintiffCase: z.string().optional(),
   defendantCase: z.string().optional(),
   workToBeDone: z.string().optional(),
@@ -129,8 +129,8 @@ export async function POST(req: NextRequest) {
     const newCaseRef = casesRef.push();
 
     const caseData = {
-      title,
-      description,
+      title: title || "",
+      description: description || "",
       plaintiffCase: plaintiffCase || "",
       defendantCase: defendantCase || "",
       workToBeDone: workToBeDone || "",
