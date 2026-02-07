@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "firestore:cleanup": "node scripts/firestore-cleanup.js"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.19.0",

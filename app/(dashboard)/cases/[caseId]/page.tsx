@@ -536,102 +536,25 @@ function PreviewModal({
     );
 }
 
+type DocWithMeta = DocumentResource & { isImage?: boolean; isPDF?: boolean; category?: string };
+
 const CaseDocumentsTab: React.FC<{ caseId: string }> = ({ caseId }) => {
     const { user } = useAuth();
     const db = getFirestore(app);
 
-    // Verify user is authenticated before making Firestore calls
-    if (!user) {
-        return (
-            <div className="bg-white rounded-lg shadow-md p-4">
-                <div className="text-center py-6 text-slate-500 text-sm">
-                    Please log in to view documents.
-                </div>
-            </div>
-        );
-    }
-    const [docs, setDocs] = useState<(DocumentResource & { isImage?: boolean; isPDF?: boolean })[]>([]);
+    const [allDocs, setAllDocs] = useState<DocWithMeta[]>([]);
     const [loading, setLoading] = useState(true);
-    const [uploading, setUploading] = useState(false);
+    const [uploading, setUploading] = useState<string | null>(null);
     const [error, setError] = useState("");
     const [previewDoc, setPreviewDoc] = useState<{ url: string; name: string; type: string } | null>(null);
 
-    // Load documents
-    useEffect(() => {
+    const fetchDocs = React.useCallback(async () => {
         if (!user || !caseId) return;
-        const fetchDocs = async () => {
-            setLoading(true);
-            const q = query(collection(db, "documents"), where("caseId", "==", caseId));
-            try {
-                const snap = await getDocs(q);
-                setDocs(
-                    snap.docs.map(doc => {
-                        const data = doc.data();
-                        return {
-                            id: doc.id,
-                            caseId: data.caseId,
-                            name: data.name,
-                            url: data.url,
-                            uploadedBy: data.uploadedBy,
-                            uploadedAt: data.uploadedAt,
-                            path: data.path,
-                            type: data.type,
-                            size: data.size,
-                            isImage: data.isImage,
-                            isPDF: data.isPDF,
-                        } as DocumentResource & { isImage?: boolean; isPDF?: boolean };
-                    })
-                );
-                setError("");
-            } catch (err: unknown) {
-                console.error("Error loading documents:", err);
-                let message = "Could not load documents";
-                if (err instanceof Error) {
-                    if (err.message.includes("permission") || err.message.includes("Missing") || err.message.includes("insufficient")) {
-                        message = "Permission denied. Please configure Firebase security rules. See FIREBASE_SECURITY_RULES.md";
-                    } else {
-                        message = err.message;
-                    }
-                    console.error("Error details:", err.stack);
-                }
-                setError(message);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchDocs();
-    }, [user, caseId, db]);
-
-    // Handle upload
-    const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        const input = e.currentTarget.elements.namedItem("docfile") as HTMLInputElement;
-        if (!input?.files?.[0]) return;
-        const file = input.files[0];
-        setUploading(true);
-        setError("");
+        setLoading(true);
+        const q = query(collection(db, "documents"), where("caseId", "==", caseId));
         try {
-            // Upload to GCS via API
-            const { url, path } = await uploadCaseDocument(caseId, file);
-
-            const fileType = file.type || "";
-            const isImage = fileType.startsWith("image/");
-            const isPDF = fileType === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
-
-            await addDoc(collection(db, "documents"), {
-                caseId,
-                name: file.name,
-                url,
-                uploadedBy: user?.uid,
-                uploadedAt: Timestamp.now(),
-                path: path,
-                type: fileType || "unknown",
-                size: file.size,
-                isImage,
-                isPDF,
-            });
-            const snap = await getDocs(query(collection(db, "documents"), where("caseId", "==", caseId)));
-            setDocs(snap.docs.map(doc => {
+            const snap = await getDocs(q);
+            const list = snap.docs.map(doc => {
                 const data = doc.data();
                 return {
                     id: doc.id,
@@ -645,101 +568,150 @@ const CaseDocumentsTab: React.FC<{ caseId: string }> = ({ caseId }) => {
                     size: data.size,
                     isImage: data.isImage,
                     isPDF: data.isPDF,
-                } as DocumentResource & { isImage?: boolean; isPDF?: boolean };
-            }));
+                    category: data.category,
+                } as DocWithMeta;
+            });
+            setAllDocs(list);
+            setError("");
         } catch (err: unknown) {
-            let message = "Upload failed";
-            if (err instanceof Error) message = err.message;
-            setError(message);
+            console.error("Error loading documents:", err);
+            setError(err instanceof Error ? err.message : "Could not load documents");
+        } finally {
+            setLoading(false);
         }
-        setUploading(false);
-        if (input) input.value = "";
+    }, [user, caseId, db]);
+
+    useEffect(() => {
+        fetchDocs();
+    }, [fetchDocs]);
+
+    const plaintiffDocs = allDocs.filter(d => d.category === "plaintiff");
+    const defendantDocs = allDocs.filter(d => d.category === "defendant");
+
+    const uploadSection = async (files: FileList | null, category: "plaintiff" | "defendant") => {
+        if (!user || !files?.length) return;
+        setError("");
+        setUploading(category);
+        const fileArray = Array.from(files);
+        let lastError = "";
+        for (let i = 0; i < fileArray.length; i++) {
+            const file = fileArray[i];
+            try {
+                const { url, path } = await uploadCaseDocument(caseId, file);
+                const fileType = file.type || "";
+                const isImage = fileType.startsWith("image/");
+                const isPDF = fileType === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+                await addDoc(collection(db, "documents"), {
+                    caseId,
+                    name: file.name,
+                    url,
+                    uploadedBy: user.uid,
+                    uploadedAt: Timestamp.now(),
+                    path,
+                    type: fileType || "unknown",
+                    size: file.size,
+                    isImage,
+                    isPDF,
+                    category,
+                });
+            } catch (err) {
+                const msg = err instanceof Error ? err.message : "Upload failed";
+                lastError = msg;
+                setError(`${file.name}: ${msg}`);
+            }
+        }
+        setUploading(null);
+        if (!lastError) setError("");
+        await fetchDocs();
     };
 
-    // Handle delete
     const handleDelete = async (docId: string, fileUrl: string) => {
-        if (!user) {
-            setError("You must be logged in to delete documents.");
-            return;
-        }
-
-        if (!confirm("Are you sure you want to delete this document?")) {
-            return;
-        }
-
+        if (!user) return;
+        if (!confirm("Are you sure you want to delete this document?")) return;
         try {
             setError("");
-            // Delete from GCS first
             try {
                 await deleteFile(fileUrl);
-            } catch (storageError) {
-                console.warn("Error deleting from storage:", storageError);
-                // Continue to delete metadata even if storage delete fails
+            } catch {
+                /* continue */
             }
-
-            // Delete from Firestore
             await deleteDoc(fsDoc(db, "documents", docId));
-            setDocs(prev => prev.filter(d => d.id !== docId));
-        } catch (err: unknown) {
-            console.error("Error deleting document:", err);
-            let message = "Delete failed";
-            if (err instanceof Error) {
-                if (err.message.includes("permission") || err.message.includes("Missing") || err.message.includes("insufficient")) {
-                    message = "Permission denied. Please check Firebase security rules. See FIREBASE_SECURITY_RULES.md";
-                } else {
-                    message = err.message;
-                }
-            }
-            setError(message);
+            setAllDocs(prev => prev.filter(d => d.id !== docId));
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Delete failed");
         }
     };
 
-    return (
-        <div className="bg-white rounded-lg shadow-md p-3 sm:p-4">
-            <form onSubmit={handleUpload} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mb-3 sm:mb-4 pb-2 sm:pb-3 border-b border-slate-200">
+    if (!user) {
+        return (
+            <div className="bg-white rounded-lg shadow-md p-4">
+                <div className="text-center py-6 text-slate-500 text-sm">Please log in to view documents.</div>
+            </div>
+        );
+    }
+
+    const DocSection: React.FC<{
+        title: string;
+        docs: DocWithMeta[];
+        inputName: string;
+        category: "plaintiff" | "defendant";
+    }> = ({ title, docs, inputName, category }) => (
+        <div className="mb-6 last:mb-0">
+            <h3 className="text-sm font-semibold text-slate-800 mb-2">{title}</h3>
+            <form
+                className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mb-3"
+                onSubmit={async (e) => {
+                    e.preventDefault();
+                    const input = e.currentTarget.elements.namedItem(inputName) as HTMLInputElement;
+                    await uploadSection(input?.files ?? null, category);
+                    if (input) input.value = "";
+                }}
+            >
                 <input
                     type="file"
-                    name="docfile"
+                    name={inputName}
                     accept="image/*,.pdf,.doc,.docx"
-                    className="flex-1 rounded border border-slate-300 px-2 sm:px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                    required
+                    multiple
+                    className="flex-1 rounded border border-slate-300 px-2 sm:px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
                 />
                 <button
                     type="submit"
-                    disabled={uploading}
-                    className="bg-slate-900 text-white rounded px-3 sm:px-4 py-2 hover:bg-slate-800 transition font-semibold shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-xs sm:text-sm"
+                    disabled={uploading !== null}
+                    className="bg-slate-900 text-white rounded px-3 sm:px-4 py-2 hover:bg-slate-800 font-semibold text-xs sm:text-sm disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                    <FaUpload /> {uploading ? "Uploading..." : "Upload"}
+                    <FaUpload /> {uploading === category ? "Uploading..." : "Upload"}
                 </button>
             </form>
+            {docs.length === 0 ? (
+                <p className="text-slate-500 text-sm py-2">No documents in this section.</p>
+            ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3">
+                    {docs.map((d) => (
+                        <DocCard
+                            key={d.id}
+                            d={d}
+                            onPreview={(url, name, type) => setPreviewDoc({ url, name, type })}
+                            onDelete={handleDelete}
+                        />
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+
+    return (
+        <div className="bg-white rounded-lg shadow-md p-3 sm:p-4">
             {error && <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg mb-3 text-sm">{error}</div>}
             {loading ? (
                 <div className="text-center py-6">
-                    <div className="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-slate-900"></div>
+                    <div className="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-slate-900" />
                     <p className="mt-2 text-slate-600 text-sm">Loading documents...</p>
                 </div>
-            ) : docs.length === 0 ? (
-                <div className="text-center py-6 text-slate-500 text-sm">No documents found. Upload your first document!</div>
             ) : (
                 <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3">
-                        {docs.map((d) => (
-                            <DocCard
-                                key={d.id}
-                                d={d}
-                                onPreview={(url, name, type) => setPreviewDoc({ url, name, type })}
-                                onDelete={handleDelete}
-                            />
-                        ))}
-                    </div>
-
-                    {/* Preview Modal - uses signed URL for private GCS */}
-                    {previewDoc && (
-                        <PreviewModal
-                            previewDoc={previewDoc}
-                            onClose={() => setPreviewDoc(null)}
-                        />
-                    )}
+                    <DocSection title="Plaintiff / Petitioner Documents (Optional)" docs={plaintiffDocs} inputName="docfile_plaintiff" category="plaintiff" />
+                    <DocSection title="Dependent / Opposite Party Documents (Optional)" docs={defendantDocs} inputName="docfile_defendant" category="defendant" />
+                    {previewDoc && <PreviewModal previewDoc={previewDoc} onClose={() => setPreviewDoc(null)} />}
                 </>
             )}
         </div>
