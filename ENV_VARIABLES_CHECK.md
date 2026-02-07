@@ -1,52 +1,48 @@
 # ✅ Environment Variables Checklist
 
-## Required for Vercel Blob Storage
+## Required for Google Cloud Storage (GCS)
 
-Make sure you have this in your `.env.local` file:
+Make sure you have these in your `.env.local` file:
 
 ```env
-BLOB_READ_WRITE_TOKEN=vercel_blob_xxxxx
+GCS_BUCKET=your-bucket-name
+GCS_SERVICE_ACCOUNT_KEY={"type":"service_account","project_id":"...","private_key_id":"...","private_key":"...","client_email":"...","client_id":"...","auth_uri":"...","token_uri":"...",...}
 ```
 
-**Important:** The variable name must be exactly `BLOB_READ_WRITE_TOKEN` (not `prod_READ_WRITE_TOKEN` or any other variation).
+**Alternative:** If running on GCE/Cloud Run or with a key file, you can use:
+
+```env
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json
+GCS_BUCKET=your-bucket-name
+```
 
 ## Quick Verification
 
 1. **Check your `.env.local` file:**
-
-   - Variable name: `BLOB_READ_WRITE_TOKEN`
-   - Value: Your Vercel Blob token (starts with `vercel_blob_`)
+   - `GCS_BUCKET`: Your GCS bucket name
+   - `GCS_SERVICE_ACCOUNT_KEY`: Full JSON key (single line) **or** set `GOOGLE_APPLICATION_CREDENTIALS` to key file path
 
 2. **Restart your dev server:**
-
    ```bash
-   # Stop the server (Ctrl+C)
    npm run dev
    ```
 
 3. **Test file upload:**
    - Try uploading a document in the cases page
-   - Check browser console for any errors
-   - Check server logs for token-related errors
+   - Check browser console and server logs for errors
 
 ## Common Issues
 
-### Wrong Variable Name
+### Bucket not set
+- Ensure `GCS_BUCKET` is set and the bucket exists in Google Cloud.
 
-❌ `prod_READ_WRITE_TOKEN`  
-❌ `BLOB_TOKEN`  
-❌ `VERCEL_BLOB_TOKEN`
+### Authentication
+- For serverless (Vercel etc.), use `GCS_SERVICE_ACCOUNT_KEY` with the full JSON key as a single-line string.
+- For local or GCE, `GOOGLE_APPLICATION_CREDENTIALS` pointing to a key file works.
 
-✅ `BLOB_READ_WRITE_TOKEN` (correct)
+### Public read for uploaded files
+- To use public URLs (`https://storage.googleapis.com/...`), configure the bucket for public read (e.g. add a bucket policy or set object ACL). Alternatively, use signed URLs (see `lib/gcs.ts`).
 
-### Token Not Loading
-
-- Make sure `.env.local` is in the project root (`llb-case-tracker/`)
-- Restart the dev server after adding/changing environment variables
-- Check that the token value doesn't have extra quotes or spaces
-
-### Still Getting Errors
-
-1. Verify token is valid in Vercel Dashboard
-2. Check token has read/write permissions
-3. Ensure you're using the correct token for your environment (dev vs production)
+### Still getting errors
+1. Verify the service account has **Storage Object Admin** (or **Storage Admin**) on the bucket.
+2. Ensure the key JSON is valid and has no extra newlines when pasted (use a single line).

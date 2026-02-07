@@ -37,6 +37,9 @@ yarn-error.log*
 firebase.json
 firebase-adminsdk-*.json
 *-service-account.json
+
+# GCS service account key (NEVER commit!)
+case-tracker-storage-*.json
 ENV_VARIABLES_SETUP.md
 
 # vercel

@@ -4,8 +4,8 @@ import { z } from "zod";
 
 const schema = z.object({
   id: z.string(),
-  title: z.string().min(2),
-  description: z.string().min(2),
+  title: z.string().optional(),
+  description: z.string().optional(),
   plaintiffCase: z.string().optional(),
   defendantCase: z.string().optional(),
   workToBeDone: z.string().optional(),
@@ -112,8 +112,10 @@ export async function PATCH(req: NextRequest) {
     }
 
     const updateData: any = {
-      title,
-      description,
+      title:
+        title !== undefined ? title || "" : existingCase.title || "",
+      description:
+        description !== undefined ? description || "" : existingCase.description || "",
       plaintiffCase:
         plaintiffCase !== undefined
           ? plaintiffCase || ""

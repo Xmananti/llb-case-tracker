@@ -7,7 +7,7 @@ This guide will help you deploy AdvocatePro to production on Vercel.
 - [ ] Firebase project configured and active
 - [ ] Firebase security rules deployed
 - [ ] Vercel account created (sign up at https://vercel.com)
-- [ ] Vercel Blob Storage token obtained
+- [ ] Google Cloud Storage bucket and service account key configured
 - [ ] All environment variables ready
 
 ## Step 1: Test Build Locally
@@ -119,18 +119,19 @@ FIREBASE_DATABASE_URL=https://llb-case-tracker-default-rtdb.firebaseio.com
 FIREBASE_CONFIG_BASE64=<base64_encoded_service_account_json>
 ```
 
-#### 3. Vercel Blob Storage (Required for file uploads)
+#### 3. Google Cloud Storage (Required for file uploads)
 
 ```
-BLOB_READ_WRITE_TOKEN=vercel_blob_xxxxx
+GCS_BUCKET=your-bucket-name
+GCS_SERVICE_ACCOUNT_KEY={"type":"service_account",...}
 ```
 
-**How to get Vercel Blob Token:**
+**How to set up GCS:**
 
-1. Go to [Vercel Dashboard](https://vercel.com/dashboard)
-2. Navigate to **Storage** → **Blob**
-3. Create a new Blob store (if needed)
-4. Copy the **BLOB_READ_WRITE_TOKEN**
+1. Create a GCS bucket in [Google Cloud Console](https://console.cloud.google.com/storage)
+2. Create a service account with **Storage Object Admin** (or **Storage Admin**) on the bucket
+3. Download the JSON key and set `GCS_SERVICE_ACCOUNT_KEY` to the full JSON (single line), or use `GOOGLE_APPLICATION_CREDENTIALS` with the key file path
+4. For public file URLs, configure the bucket for public read or use signed URLs (see `lib/gcs.ts`)
 
 ### Environment Variable Settings:
 
@@ -191,9 +192,9 @@ firebase deploy --only firestore:indexes
 
 ### File Upload Not Working
 
-- Verify `BLOB_READ_WRITE_TOKEN` is set in Vercel
-- Check token has read/write permissions
-- Verify Vercel Blob store is created
+- Verify `GCS_BUCKET` and `GCS_SERVICE_ACCOUNT_KEY` (or `GOOGLE_APPLICATION_CREDENTIALS`) are set
+- Ensure the service account has Storage Object Admin on the bucket
+- Check bucket exists and is in the same project as the key
 
 ### API Routes Not Working
 

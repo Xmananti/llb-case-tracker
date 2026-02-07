@@ -2,7 +2,7 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
 import { getAnalytics, Analytics } from "firebase/analytics";
 import { getAuth, Auth } from "firebase/auth";
-// Firebase Storage is no longer used - we use Vercel Blob Storage instead
+// Firebase Storage is no longer used - we use Google Cloud Storage (GCS) instead
 // import { getStorage, FirebaseStorage } from "firebase/storage";
 import { getFirestore, Firestore } from "firebase/firestore";
 import { getDatabase, Database } from "firebase/database";
@@ -54,7 +54,7 @@ export const analytics: Analytics | null =
 
 // Initialize and export Firebase services
 export const auth: Auth = getAuth(app);
-// Storage is now handled by Vercel Blob - see lib/storage/blob.ts
+// Storage is now handled by GCS - see lib/storage/blob.ts and lib/gcs.ts
 // export const storage: FirebaseStorage = getStorage(app);
 export const db: Firestore = getFirestore(app);
 export const database: Database = getDatabase(app);

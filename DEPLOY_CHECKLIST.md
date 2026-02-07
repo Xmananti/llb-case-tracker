@@ -35,9 +35,10 @@ Choose ONE option:
 
 - [ ] `FIREBASE_CONFIG_BASE64`
 
-### Vercel Blob Storage
+### Google Cloud Storage (file uploads)
 
-- [ ] `BLOB_READ_WRITE_TOKEN`
+- [ ] `GCS_BUCKET`
+- [ ] `GCS_SERVICE_ACCOUNT_KEY` (JSON string) or `GOOGLE_APPLICATION_CREDENTIALS`
 
 ## Deployment Steps
 

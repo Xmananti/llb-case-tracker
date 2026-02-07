@@ -1,6 +1,5 @@
 /**
- * Vercel Blob Storage implementation
- * Replaces Firebase Storage for free file storage
+ * File storage client: upload/delete go through API routes backed by Google Cloud Storage (GCS).
  */
 
 export interface UploadProgress {
@@ -15,9 +14,8 @@ export interface UploadResult {
 }
 
 /**
- * Upload a file to Vercel Blob Storage
- * All uploads go through the server route to avoid CORS issues
- * The server route uses Node.js runtime which handles larger files
+ * Upload a file via the server API (GCS-backed).
+ * All uploads go through the server route; the API uses Node.js runtime for larger files.
  */
 export async function uploadFile(
   path: string,
@@ -30,8 +28,7 @@ export async function uploadFile(
 
   // Simulate progress for better UX
   if (onProgress) {
-    // Since Vercel Blob doesn't support progress callbacks in the API,
-    // we simulate progress based on file size
+    // API doesn't stream progress; simulate based on file size
     const simulateProgress = () => {
       let progress = 0;
       const interval = setInterval(() => {
@@ -69,7 +66,7 @@ export async function uploadFile(
           // If response is not JSON, check status
           if (response.status === 413) {
             errorMessage =
-              "File is too large. Maximum file size is 100MB. For files over 4MB, please contact support.";
+              "File is too large or request was truncated. Try a smaller file (e.g. under 10MB) and restart the dev server.";
           } else if (response.status === 0 || response.type === "opaque") {
             errorMessage =
               "CORS error: Upload failed due to network restrictions. Please check your connection and try again.";
@@ -138,7 +135,7 @@ export async function uploadFile(
 }
 
 /**
- * Delete a file from Vercel Blob Storage
+ * Delete a file via the server API (GCS-backed).
  */
 export async function deleteFile(url: string): Promise<void> {
   const response = await fetch(
@@ -184,9 +181,8 @@ export async function uploadUserLogo(
 }
 
 /**
- * Get file URL (Vercel Blob URLs are already public, so just return the URL)
+ * Get file URL (GCS public URLs are used as-is).
  */
 export async function getFileUrl(url: string): Promise<string> {
-  // Vercel Blob URLs are already public, so we just return the URL
   return url;
 }

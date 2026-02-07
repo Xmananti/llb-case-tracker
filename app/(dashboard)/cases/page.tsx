@@ -380,7 +380,8 @@ const CasesPage: React.FC = () => {
                         });
                     } catch (uploadError) {
                         console.error("Error uploading plaintiff file:", uploadError);
-                        setError(`Failed to upload ${file.name}. Please try uploading it manually in the case details.`);
+                        const msg = uploadError instanceof Error ? uploadError.message : "";
+                        setError(msg.includes("permission denied") || msg.includes("GCS_SETUP") || msg.includes("FIX_GCS_403") ? msg : `Failed to upload ${file.name}. Please try uploading it manually in the case details.`);
                         setUploadProgress(prev => {
                             const newProgress = { ...prev };
                             delete newProgress[fileKey];
@@ -400,7 +401,7 @@ const CasesPage: React.FC = () => {
                     const file = selectedFiles[i];
                     const fileKey = editId ? `edit_${i}` : `new_${i}`;
                     try {
-                        // Upload to Vercel Blob Storage with progress tracking
+                        // Upload to GCS via API with progress tracking
                         const { url, path } = await uploadCaseDocument(caseIdForUpload, file, (progress) => {
                             const percent = (progress.loaded / progress.total) * 100;
                             setUploadProgress(prev => ({ ...prev, [fileKey]: percent }));
@@ -432,7 +433,8 @@ const CasesPage: React.FC = () => {
                         });
                     } catch (uploadError) {
                         console.error("Error uploading file:", uploadError);
-                        setError(`Failed to upload ${file.name}. Please try uploading it manually in the case details.`);
+                        const msg = uploadError instanceof Error ? uploadError.message : "";
+                        setError(msg.includes("permission denied") || msg.includes("GCS_SETUP") || msg.includes("FIX_GCS_403") ? msg : `Failed to upload ${file.name}. Please try uploading it manually in the case details.`);
                         setUploadProgress(prev => {
                             const newProgress = { ...prev };
                             delete newProgress[fileKey];
@@ -472,7 +474,8 @@ const CasesPage: React.FC = () => {
                         });
                     } catch (uploadError) {
                         console.error("Error uploading citation file:", uploadError);
-                        setError(`Failed to upload citation ${file.name}. You can try uploading it later from the case details page.`);
+                        const msg = uploadError instanceof Error ? uploadError.message : "";
+                        setError(msg.includes("permission denied") || msg.includes("GCS_SETUP") || msg.includes("FIX_GCS_403") ? msg : `Failed to upload citation ${file.name}. You can try uploading it later from the case details page.`);
                     }
                 }
             }
@@ -834,7 +837,6 @@ const CasesPage: React.FC = () => {
                                 <table className="w-full">
                                     <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
                                         <tr>
-                                            <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Title</th>
                                             <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Case Number</th>
                                             <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Status</th>
                                             <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Court</th>
@@ -854,13 +856,8 @@ const CasesPage: React.FC = () => {
                                                         href={`/cases/${c.id}`}
                                                         className="text-sm font-semibold text-slate-900 hover:text-amber-600 transition"
                                                     >
-                                                        {c.title}
-                                                    </Link>
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <span className="text-sm text-slate-600">
                                                         {c.caseNumber || "—"}
-                                                    </span>
+                                                    </Link>
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     {c.status && (

@@ -75,3 +75,16 @@ body {
 .animate-slide-in-right {
   animation: slide-in-right 0.3s ease-out;
 }
+
+/* TipTap rich text editor */
+.rich-text-editor-content p { margin: 0.25em 0; }
+.rich-text-editor-content ul { list-style: disc; margin: 0.25em 0; padding-left: 1.5rem; }
+.rich-text-editor-content ol { list-style: decimal; margin: 0.25em 0; padding-left: 1.5rem; }
+.rich-text-editor-content h1 { font-size: 1.25rem; font-weight: 700; margin: 0.5em 0; }
+.rich-text-editor-content h2 { font-size: 1.125rem; font-weight: 600; margin: 0.5em 0; }
+.rich-text-editor-content h3 { font-size: 1rem; font-weight: 600; margin: 0.5em 0; }
+.rich-text-editor-content .is-editor-empty:first-child::before { content: attr(data-placeholder); color: #94a3b8; float: left; height: 0; pointer-events: none; }
+/* Ensure TipTap editor wrapper and content are visible */
+[data-tiptap-editor] { min-height: 120px; outline: none; }
+.ProseMirror { min-height: 120px; outline: none; }
+
