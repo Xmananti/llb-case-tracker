@@ -5,7 +5,7 @@ import { updateProfile } from "firebase/auth";
 import { uploadUserLogo, deleteFile } from "../../../lib/firebase/storage";
 
 const ProfilePage: React.FC = () => {
-    const { user, userData, logout, refreshUserData } = useAuth();
+    const { user, userData, logout, refreshUserData, changePassword } = useAuth();
     const [editMode, setEditMode] = useState(false);
     const [firmEditMode, setFirmEditMode] = useState(false);
     const [displayName, setDisplayName] = useState(user?.displayName || "");
@@ -13,6 +13,9 @@ const ProfilePage: React.FC = () => {
     const [message, setMessage] = useState("");
     const [uploadingLogo, setUploadingLogo] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [passwordForm, setPasswordForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
+    const [passwordLoading, setPasswordLoading] = useState(false);
+    const [passwordMessage, setPasswordMessage] = useState("");
 
     useEffect(() => {
         if (userData?.firmName) {
@@ -136,6 +139,38 @@ const ProfilePage: React.FC = () => {
             setMessage("Failed to remove logo. Please try again.");
         }
     };
+
+    const handleChangePassword = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!user?.email) return;
+        if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+            setPasswordMessage("New passwords do not match.");
+            return;
+        }
+        if (passwordForm.newPassword.length < 6) {
+            setPasswordMessage("New password must be at least 6 characters.");
+            return;
+        }
+        setPasswordLoading(true);
+        setPasswordMessage("");
+        try {
+            await changePassword(passwordForm.currentPassword, passwordForm.newPassword);
+            setPasswordMessage("Password updated successfully.");
+            setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+        } catch (err: unknown) {
+            const error = err as { code?: string; message?: string };
+            if (error.code === "auth/wrong-password" || error.code === "auth/invalid-credential") {
+                setPasswordMessage("Current password is incorrect.");
+            } else if (error.code === "auth/weak-password") {
+                setPasswordMessage("New password is too weak. Use at least 6 characters.");
+            } else {
+                setPasswordMessage(error.message || "Failed to change password. Please try again.");
+            }
+        } finally {
+            setPasswordLoading(false);
+        }
+    };
+
     return (
         <div className="max-w-2xl mx-auto mt-8">
             <div className="bg-white rounded-lg shadow-lg p-8 border-l-4 border-amber-500">
@@ -238,6 +273,52 @@ const ProfilePage: React.FC = () => {
                             />
                         </div>
                         <p className="text-xs text-slate-500 mt-2">Recommended: Square image, max 5MB (PNG, JPG, or GIF)</p>
+                    </div>
+                    <div className="pb-4 border-b border-slate-200">
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">Change password</label>
+                        <form onSubmit={handleChangePassword} className="space-y-3 max-w-md">
+                            <input
+                                type="password"
+                                placeholder="Current password"
+                                value={passwordForm.currentPassword}
+                                onChange={e => setPasswordForm(f => ({ ...f, currentPassword: e.target.value }))}
+                                className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                                required
+                                autoComplete="current-password"
+                            />
+                            <input
+                                type="password"
+                                placeholder="New password (min 6 characters)"
+                                value={passwordForm.newPassword}
+                                onChange={e => setPasswordForm(f => ({ ...f, newPassword: e.target.value }))}
+                                className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                                required
+                                minLength={6}
+                                autoComplete="new-password"
+                            />
+                            <input
+                                type="password"
+                                placeholder="Confirm new password"
+                                value={passwordForm.confirmPassword}
+                                onChange={e => setPasswordForm(f => ({ ...f, confirmPassword: e.target.value }))}
+                                className="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                                required
+                                minLength={6}
+                                autoComplete="new-password"
+                            />
+                            {passwordMessage && (
+                                <div className={`px-4 py-3 rounded-lg text-sm ${passwordMessage.includes("successfully") ? "bg-green-50 border border-green-200 text-green-700" : "bg-red-50 border border-red-200 text-red-700"}`}>
+                                    {passwordMessage}
+                                </div>
+                            )}
+                            <button
+                                type="submit"
+                                disabled={passwordLoading}
+                                className="bg-slate-900 text-white px-4 py-2.5 rounded-lg hover:bg-slate-800 transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {passwordLoading ? "Updating..." : "Update password"}
+                            </button>
+                        </form>
                     </div>
                     {message && <div className={`px-4 py-3 rounded-lg ${message.includes("successfully") || message.includes("updated") ? "bg-green-50 border border-green-200 text-green-700" : "bg-red-50 border border-red-200 text-red-700"}`}>{message}</div>}
                     <button onClick={() => logout()} className="w-full bg-red-600 text-white px-6 py-3 mt-6 rounded-lg hover:bg-red-700 transition font-semibold shadow-md">Logout</button>
