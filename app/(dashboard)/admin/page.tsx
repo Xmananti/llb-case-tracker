@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { useAuth } from "../../../context/AuthContext";
 import { createOrganization, getOrganizations, updateOrganizationSubscription } from "../../../lib/api-client";
 import { SUBSCRIPTION_PLANS } from "../../../lib/types/organization";
-import { FaBuilding, FaUsers, FaFileAlt, FaCheckCircle, FaTimes, FaEdit, FaPlus } from "react-icons/fa";
+import { FaBuilding, FaUsers, FaFileAlt, FaCheckCircle, FaTimes, FaEdit, FaPlus, FaKey } from "react-icons/fa";
 
 interface Organization {
   id: string;
@@ -23,6 +23,11 @@ const AdminPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [resetPasswordForm, setResetPasswordForm] = useState({ email: "", newPassword: "", confirmPassword: "" });
+  const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
+  const [resetPasswordError, setResetPasswordError] = useState("");
+  const [resetPasswordSuccess, setResetPasswordSuccess] = useState(false);
   const [editingOrg, setEditingOrg] = useState<Organization | null>(null);
   const [form, setForm] = useState({
     name: "",
@@ -84,6 +89,44 @@ const AdminPage: React.FC = () => {
       fetchOrganizations();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update subscription");
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    if (resetPasswordForm.newPassword !== resetPasswordForm.confirmPassword) {
+      setResetPasswordError("Passwords do not match");
+      return;
+    }
+    if (resetPasswordForm.newPassword.length < 6) {
+      setResetPasswordError("Password must be at least 6 characters");
+      return;
+    }
+    setResetPasswordLoading(true);
+    setResetPasswordError("");
+    setResetPasswordSuccess(false);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch("/api/auth/admin-reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          email: resetPasswordForm.email.trim(),
+          newPassword: resetPasswordForm.newPassword,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setResetPasswordError(data.error || "Failed to reset password");
+        return;
+      }
+      setResetPasswordSuccess(true);
+      setResetPasswordForm({ email: "", newPassword: "", confirmPassword: "" });
+    } catch (err) {
+      setResetPasswordError(err instanceof Error ? err.message : "Failed to reset password");
+    } finally {
+      setResetPasswordLoading(false);
     }
   };
 
@@ -197,6 +240,70 @@ const AdminPage: React.FC = () => {
           })}
         </div>
       )}
+
+      {/* Reset user password section */}
+      <div className="mt-8 bg-white rounded-lg border border-slate-200 p-4 sm:p-6 shadow-sm max-w-md">
+        <h3 className="text-lg font-bold text-slate-900 mb-2 flex items-center gap-2">
+          <FaKey /> Reset user password
+        </h3>
+        <p className="text-sm text-slate-600 mb-4">
+          Set a new password for any user by email. Only owners and admins can use this.
+        </p>
+        {resetPasswordSuccess && (
+          <div className="mb-4 rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-sm text-green-700">
+            Password has been reset. The user can sign in with the new password.
+          </div>
+        )}
+        {resetPasswordError && (
+          <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
+            {resetPasswordError}
+          </div>
+        )}
+        <form onSubmit={handleResetPassword} className="space-y-3">
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1">User email</label>
+            <input
+              type="email"
+              value={resetPasswordForm.email}
+              onChange={(e) => setResetPasswordForm({ ...resetPasswordForm, email: e.target.value })}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              placeholder="user@example.com"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1">New password</label>
+            <input
+              type="password"
+              value={resetPasswordForm.newPassword}
+              onChange={(e) => setResetPasswordForm({ ...resetPasswordForm, newPassword: e.target.value })}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              placeholder="Min 6 characters"
+              minLength={6}
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1">Confirm new password</label>
+            <input
+              type="password"
+              value={resetPasswordForm.confirmPassword}
+              onChange={(e) => setResetPasswordForm({ ...resetPasswordForm, confirmPassword: e.target.value })}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+              placeholder="Repeat password"
+              minLength={6}
+              required
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={resetPasswordLoading}
+            className="w-full bg-slate-900 text-white px-4 py-2 rounded-lg hover:bg-slate-800 transition font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {resetPasswordLoading ? "Resetting..." : "Set password for user"}
+          </button>
+        </form>
+      </div>
 
       {/* Create Organization Modal */}
       {showCreateModal && (

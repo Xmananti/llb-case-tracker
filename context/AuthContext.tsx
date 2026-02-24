@@ -1,6 +1,6 @@
 "use client";
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut, User, createUserWithEmailAndPassword } from 'firebase/auth';
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut, User, createUserWithEmailAndPassword, sendPasswordResetEmail, EmailAuthProvider, reauthenticateWithCredential, updatePassword, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { auth } from '../lib/firebase/config';
 
 interface UserData {
@@ -19,8 +19,11 @@ interface AuthContextType {
     userData: UserData | null;
     loading: boolean;
     login: (email: string, password: string) => Promise<void>;
+    loginWithGoogle: () => Promise<void>;
     logout: (onSuccess?: () => void) => Promise<void>;
     register: (email: string, password: string, organizationId?: string, role?: string) => Promise<void>;
+    forgotPassword: (email: string) => Promise<void>;
+    changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
     refreshUserData: () => Promise<void>;
 }
 
@@ -98,6 +101,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             throw error;
         }
     };
+
+    const loginWithGoogle = async () => {
+        const provider = new GoogleAuthProvider();
+        await signInWithPopup(auth, provider);
+        // User record is created/updated when fetchUserData runs after onAuthStateChanged
+    };
+
     const logout = async (onSuccess?: () => void) => {
         try {
             await signOut(auth);
@@ -130,8 +140,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
+    const forgotPassword = async (email: string) => {
+        await sendPasswordResetEmail(auth, email);
+    };
+
+    const changePassword = async (currentPassword: string, newPassword: string) => {
+        if (!user?.email) throw new Error("You must be signed in with email to change password.");
+        const credential = EmailAuthProvider.credential(user.email, currentPassword);
+        await reauthenticateWithCredential(user, credential);
+        await updatePassword(user, newPassword);
+    };
+
     return (
-        <AuthContext.Provider value={{ user, userData, loading, login, logout, register, refreshUserData }}>
+        <AuthContext.Provider value={{ user, userData, loading, login, loginWithGoogle, logout, register, forgotPassword, changePassword, refreshUserData }}>
             {children}
         </AuthContext.Provider>
     );
